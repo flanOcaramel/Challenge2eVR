@@ -318,12 +318,14 @@
                 </a-entity>
             `;
             document.body.appendChild(scene);
-            // Initialize the scene after adding
-            setTimeout(() => {
+            
+            // Initialisation UNE FOIS QUE LA SCÈNE EST PRÊTE (Evite les bugs d'objets manquants)
+            scene.addEventListener('loaded', function () {
+                console.log("Scene Loaded - Launching scripts...");
                 createRain();
                 createVegetation();
                 animateGnous();
-            }, 100);
+            });
         }
     </script>
 
