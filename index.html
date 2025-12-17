@@ -193,7 +193,7 @@
 
         <!-- LE CHAT -->
         <!-- Scale 0.05. Rehaussé Y=0.15 pour ne pas être enterré -->
-        <a-entity gltf-model="#chatModel" position="-8 0.15 -13" scale="0.05 0.05 0.05" rotation="0 45 0" 
+        <a-entity gltf-model="#chatModel" position="-12 0.50 -11" scale="0.02 0.02 0.02" rotation="0 45 0" 
                   ammo-body="type: static" ammo-shape="type: hull"></a-entity>
 
         <!-- 5. LA CAISSE SPÉCIALE INTERACTIVE -->
@@ -279,9 +279,10 @@
                     trees.push({x:x, z:z});
                     var tree = document.createElement('a-entity');
                     tree.setAttribute('mixin', 'treeMixin');
-                    var s = 1.0 + Math.random() * 1.5; 
+                    // Scale augmenté ENCORE de 30% (Total: 1.69)
+                    var s = (1.0 + Math.random() * 1.5) * 3; 
                     // CORRECTION: position Y levée selon le scale (approx pivot centré)
-                    tree.setAttribute('position', {x: x, y: s * 0.75, z: z});
+                    tree.setAttribute('position', {x: x, y: s * 1, z: z});
                     tree.setAttribute('scale', {x: s, y: s, z: s});
                     tree.setAttribute('rotation', {x: 0, y: Math.random()*360, z: 0});
                     container.appendChild(tree);
