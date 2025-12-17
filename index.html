@@ -1,133 +1,210 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-<head>
-    <meta charset="utf-8">
-    <title>La Prairie Pluvieuse - VR</title>
-    <meta name="description" content="Environnement VR immersif avec physique">
+    <head>
+        <meta charset="utf-8" />
+        <title>La Prairie Pluvieuse - VR</title>
+        <meta
+            name="description"
+            content="Environnement VR immersif avec physique"
+        />
 
-    <!-- 1. IMPORT A-FRAME & LIBRARIES -->
-    <!-- A-Frame Core -->
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+        <!-- 1. IMPORT A-FRAME & LIBRARIES -->
+        <!-- A-Frame Core -->
+        <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
 
-    <!-- A-Frame Extras (Animation, Controls, etc.) -->
-    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.0.0/dist/aframe-extras.min.js"></script>
+        <!-- A-Frame Extras (Animation, Controls, etc.) -->
+        <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.0.0/dist/aframe-extras.min.js"></script>
 
-    <!-- Physics System (Ammo Driver) -->
-    <script src="https://cdn.jsdelivr.net/gh/MozillaReality/ammo.js@8bbc0ea/builds/ammo.wasm.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-physics-system@v4.2.2/dist/aframe-physics-system.min.js"></script>
+     <!-- Physics System (Ammo Driver) -->
+     <script src="https://cdn.jsdelivr.net/gh/MozillaReality/ammo.js@8bbc0ea/builds/ammo.wasm.js"></script>
+     <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-physics-system@v4.2.2/dist/aframe-physics-system.min.js"></script>
 
-    <!-- Teleport Controls -->
-    <script src="https://cdn.jsdelivr.net/gh/fernsroth/aframe-teleport-controls@master/dist/aframe-teleport-controls.min.js"></script>
+     <!-- Teleport Controls -->
+     <script src="https://unpkg.com/aframe-teleport-controls@latest/dist/aframe-teleport-controls.min.js"></script>
 
-    <!-- Custom User Scripts -->
-    <script src="./assets/js/christmas-utils.js"></script>
-    <script src="https://unpkg.com/super-hands@^3.0.3/dist/super-hands.min.js"></script> <!-- Super Hands -->
 
-    <script>
-        // Configuration simple pour la pluie (sera lancée plus bas)
-        AFRAME.registerComponent('rain-drop', {
-            init: function() {
-                this.reset();
-            },
-            tick: function() {
-                this.el.object3D.position.y -= 0.1;
-                if (this.el.object3D.position.y < 0) {
+
+        <!-- Custom User Scripts -->
+        <script src="./assets/js/christmas-utils.js"></script>
+        <script src="https://unpkg.com/super-hands@^3.0.3/dist/super-hands.min.js"></script>
+        <!-- Super Hands -->
+
+        <script>
+            // Configuration simple pour la pluie (sera lancée plus bas)
+            AFRAME.registerComponent("rain-drop", {
+                init: function () {
                     this.reset();
-                }
-            },
-            reset: function() {
-                // Position aléatoire autour du joueur (zone 20x20)
-                var x = (Math.random() - 0.5) * 20;
-                var z = (Math.random() - 0.5) * 20;
-                var y = 10 + Math.random() * 5;
-                this.el.object3D.position.set(x, y, z);
-            }
-        });
-    </script>
-</head>
-<body>
-    <!-- Login Overlay -->
-    <div id="loginOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; justify-content: center; align-items: center;">
-        <div style="background: white; padding: 20px; border-radius: 10px; text-align: center;">
-            <h2>Connexion à Challenge2eVR</h2>
-            <form id="loginForm">
-                <select id="username" required style="display: block; margin: 10px 0; padding: 10px; width: 220px;">
-                    <option value="">Select Username</option>
-                </select><br>
-                <input type="password" id="password" placeholder="Password" required style="display: block; margin: 10px 0; padding: 10px; width: 200px;"><br>
-                <button type="submit" style="padding: 10px 20px;">Login</button>
-            </form>
-            <div id="loginMessage" style="margin-top: 10px; color: red;"></div>
-        </div>
-    </div>
-
-    <!-- VR Scene will be added here after login -->
-
-    <!-- Login Script -->
-    <script>
-        // Load usernames from DB
-        fetch('https://selles-francesconi.sio-chopin.fr/Challenge2e/public/index.php?page=api_usernames')
-            .then(response => response.json())
-            .then(usernames => {
-                const select = document.getElementById('username');
-                usernames.forEach(username => {
-                    const option = document.createElement('option');
-                    option.value = username;
-                    option.textContent = username;
-                    select.appendChild(option);
-                });
-            })
-            .catch(error => console.error('Error loading usernames:', error));
-
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const message = document.getElementById('loginMessage');
-
-            fetch('https://selles-francesconi.sio-chopin.fr/Challenge2e/public/index.php?page=api_login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Load avatar
-                    const avatar = data.avatar;
-                    const modelId = avatar.model.replace('.glb', 'Model');
-
-                    // Check world
-                    const world = data.world;
-                    if (world.name.toLowerCase().includes('prairie')) {
-                        // Load prairie world
-                        document.getElementById('loginOverlay').style.display = 'none';
-                        loadVRScene(modelId);
-                    } else {
-                        // Redirect to another world
-                        window.location.href = world.url;
+                },
+                tick: function () {
+                    this.el.object3D.position.y -= 0.1;
+                    if (this.el.object3D.position.y < 0) {
+                        this.reset();
                     }
-                } else {
-                    message.textContent = data.message;
-                }
-            })
-            .catch(error => {
-                message.textContent = 'Error connecting to server.';
-                console.error(error);
+                },
+                reset: function () {
+                    // Position aléatoire autour du joueur (zone 20x20)
+                    var x = (Math.random() - 0.5) * 20;
+                    var z = (Math.random() - 0.5) * 20;
+                    var y = 10 + Math.random() * 5;
+                    this.el.object3D.position.set(x, y, z);
+                },
             });
-        });
-    </script>
+        </script>
+    </head>
+    <body>
+        <!-- Login Overlay -->
+        <div
+            id="loginOverlay"
+            style="
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                z-index: 1000;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            "
+        >
+            <div
+                style="
+                    background: white;
+                    padding: 20px;
+                    border-radius: 10px;
+                    text-align: center;
+                "
+            >
+                <h2>Connexion à Challenge2eVR</h2>
+                <form id="loginForm">
+                    <select
+                        id="username"
+                        required
+                        style="
+                            display: block;
+                            margin: 10px 0;
+                            padding: 10px;
+                            width: 220px;
+                        "
+                    >
+                        <option value="">Select Username</option></select
+                    ><br />
+                    <input
+                        type="password"
+                        id="password"
+                        placeholder="Password"
+                        required
+                        style="
+                            display: block;
+                            margin: 10px 0;
+                            padding: 10px;
+                            width: 200px;
+                        "
+                    /><br />
+                    <button type="submit" style="padding: 10px 20px">
+                        Login
+                    </button>
+                </form>
+                <div
+                    id="loginMessage"
+                    style="margin-top: 10px; color: red"
+                ></div>
+            </div>
+        </div>
 
-    <script>
-        function loadVRScene(avatarModelId) {
-            // Create the a-scene element dynamically
-            const scene = document.createElement('a-scene');
-            scene.id = 'vrScene';
-            scene.setAttribute('physics', 'driver: ammo; debug: false; gravity: -9.8');
-            scene.setAttribute('renderer', 'antialias: true; colorManagement: true;');
-            
-            // Construction de la scène HTML (Fusion de mon travail et du login)
-            scene.innerHTML = `
+        <!-- VR Scene will be added here after login -->
+
+        <!-- Login Script -->
+        <script>
+            // Load usernames from DB
+            fetch(
+                "https://selles-francesconi.sio-chopin.fr/Challenge2e/public/index.php?page=api_usernames",
+            )
+                .then((response) => response.json())
+                .then((usernames) => {
+                    const select = document.getElementById("username");
+                    usernames.forEach((username) => {
+                        const option = document.createElement("option");
+                        option.value = username;
+                        option.textContent = username;
+                        select.appendChild(option);
+                    });
+                })
+                .catch((error) =>
+                    console.error("Error loading usernames:", error),
+                );
+
+            document
+                .getElementById("loginForm")
+                .addEventListener("submit", function (e) {
+                    e.preventDefault();
+                    const username = document.getElementById("username").value;
+                    const password = document.getElementById("password").value;
+                    const message = document.getElementById("loginMessage");
+
+                    fetch(
+                        "https://selles-francesconi.sio-chopin.fr/Challenge2e/public/index.php?page=api_login",
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type":
+                                    "application/x-www-form-urlencoded",
+                            },
+                            body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
+                        },
+                    )
+                        .then((response) => response.json())
+                        .then((data) => {
+                            if (data.success) {
+                                // Load avatar
+                                const avatar = data.avatar;
+                                const modelId = avatar.model.replace(
+                                    ".glb",
+                                    "Model",
+                                );
+
+                                // Check world
+                                const world = data.world;
+                                if (
+                                    world.name.toLowerCase().includes("prairie")
+                                ) {
+                                    // Load prairie world
+                                    document.getElementById(
+                                        "loginOverlay",
+                                    ).style.display = "none";
+                                    loadVRScene(modelId);
+                                } else {
+                                    // Redirect to another world
+                                    window.location.href = world.url;
+                                }
+                            } else {
+                                message.textContent = data.message;
+                            }
+                        })
+                        .catch((error) => {
+                            message.textContent = "Error connecting to server.";
+                            console.error(error);
+                        });
+                });
+        </script>
+
+        <script>
+            function loadVRScene(avatarModelId) {
+                // Create the a-scene element dynamically
+                const scene = document.createElement("a-scene");
+                scene.id = "vrScene";
+                scene.setAttribute(
+                    "physics",
+                    "driver: ammo; debug: false; gravity: -9.8",
+                );
+                scene.setAttribute(
+                    "renderer",
+                    "antialias: true; colorManagement: true;",
+                );
+
+                // Construction de la scène HTML (Fusion de mon travail et du login)
+                scene.innerHTML = `
                 <!-- 2. ASSETS -->
                 <a-assets>
                     <!-- Texture Sol Réaliste (CDN Three.js) -->
@@ -177,13 +254,13 @@
                     </a-mixin>
 
                     <!-- Mixins Christmas (Charbon et Branche Dynamiques & Grabbables) -->
-                    <a-mixin id="coal" material="color:black" 
+                    <a-mixin id="coal" material="color:black"
                              geometry="primitive:sphere; segments-height:7; segments-width:13; radius:0.04"
                              hoverable grabbable stretchable draggable
                              ammo-shape="type:sphere; fit:manual; sphereRadius:0.04"
                              ammo-body="type:dynamic; mass:1">
                     </a-mixin>
-                    <a-mixin id="branch" material="color:#5C4033" 
+                    <a-mixin id="branch" material="color:#5C4033"
                              geometry="primitive:box; height:0.03; width:0.5; depth:0.03"
                              hoverable grabbable stretchable draggable
                              ammo-shape="type:box; fit:manual; halfExtents:0.25 0.015 0.015"
@@ -197,7 +274,7 @@
                         ammo-body="type: static"
                         ammo-shape="type: cylinder">
                     </a-mixin>
-                    
+
                     <!-- Mixin Bush (Petit buisson) -->
                     <a-mixin id="bushMixin"
                         gltf-model="#bushModel"
@@ -286,10 +363,10 @@
 
                     <!-- Objets posés AU SOL (pour Attraper) -->
                     <!-- Au pied de la caisse : Charbon et Branche -->
-                    
+
                     <!-- 1. Coal -->
                     <a-entity mixin="coal" position="0.5 0.5 0.5" scale="1 1 1"></a-entity>
-                    
+
                     <!-- 2. Branch -->
                     <a-entity mixin="branch" position="-0.5 0.5 0.5" rotation="0 45 0" scale="1 1 1"></a-entity>
                 </a-entity>
@@ -297,229 +374,314 @@
                 <!-- 6. JOUEUR (RIG CAMERA) avec SUPER HANDS et AVATAR -->
                 <a-entity id="rig">
                     <a-camera id="camera" position="0 1.6 0" look-controls wasd-controls></a-camera>
-                    
+
                     <!-- Avatar visible sur soi-même (optionnel en VR FPS mais demandé) -->
                     <a-entity id="playerAvatar" gltf-model="#${avatarModelId}" position="0 -1.6 0" scale="0.5 0.5 0.5"></a-entity>
-                    
+
                     <!-- Main Gauche -->
-                    <a-entity id="lhand" 
-                        hand-controls="hand: left" 
-                        teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: [ammo-shape]" 
+                    <a-entity id="lhand"
+                        hand-controls="hand: left"
+                        teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: [ammo-shape]"
                         sphere-collider="objects: [mixin~='coal'], [mixin~='branch']"
                         super-hands="colliderEvent: hit; colliderEventProperty: els; colliderEndEvent: hitend; colliderEndEventProperty: clearedEls">
                     </a-entity>
-                    
+
                     <!-- Main Droite -->
-                    <a-entity id="rhand" 
+                    <a-entity id="rhand"
                         hand-controls="hand: right"
                         sphere-collider="objects: [mixin~='coal'], [mixin~='branch']"
                         super-hands="colliderEvent: hit; colliderEventProperty: els; colliderEndEvent: hitend; colliderEndEventProperty: clearedEls">
                     </a-entity>
                 </a-entity>
             `;
-            document.body.appendChild(scene);
-            
-            // Initialisation UNE FOIS QUE LA SCÈNE EST PRÊTE (Evite les bugs d'objets manquants)
-            scene.addEventListener('loaded', function () {
-                console.log("Scene Loaded - Launching scripts...");
-                createRain();
-                createVegetation();
-                animateGnous();
-            }, 1000);
-        }
-    </script>
+                document.body.appendChild(scene);
 
-    <!-- Script de génération procédurale & Animation -->
-    <script>
-        // Génération Pluie
-        function createRain() {
-            var scene = document.querySelector('a-scene');
-            var rainCount = 200; 
-            for(var i=0; i<rainCount; i++) {
-                var drop = document.createElement('a-entity');
-                drop.setAttribute('geometry', 'primitive: box; height: 0.1; width: 0.01; depth: 0.01');
-                drop.setAttribute('material', 'color: #AACCFF; opacity: 0.6; transparent: true');
-                drop.setAttribute('rain-drop', '');
-                scene.appendChild(drop);
+                // Initialisation après un délai pour permettre au chargement
+                setTimeout(function () {
+                    console.log("Launching scripts...");
+                    createRain();
+                    createVegetation();
+                    animateGnous();
+                }, 2000);
             }
-        }
+        </script>
 
-        // Végétation (Arbres Decor & Bush Sol)
-        function createVegetation() {
-            var container = document.querySelector('#vegetation');
-            var treeCount = 32;
-            var trees = [];
+        <!-- Script de génération procédurale & Animation -->
+        <script>
+            // Génération Pluie
+            function createRain() {
+                var scene = document.querySelector("a-scene");
+                var rainCount = 200;
+                for (var i = 0; i < rainCount; i++) {
+                    var drop = document.createElement("a-entity");
+                    drop.setAttribute(
+                        "geometry",
+                        "primitive: box; height: 0.1; width: 0.01; depth: 0.01",
+                    );
+                    drop.setAttribute(
+                        "material",
+                        "color: #AACCFF; opacity: 0.6; transparent: true",
+                    );
+                    drop.setAttribute("rain-drop", "");
+                    scene.appendChild(drop);
+                }
+            }
 
-            for(var i=0; i<treeCount; i++) {
-                var valid = false, attempts = 0;
-                var x, z;
-                while(!valid && attempts < 50) {
-                    x = (Math.random() - 0.5) * 80;
-                    z = (Math.random() - 0.5) * 80; 
-                    var dist = Math.sqrt((x - 0)**2 + (z - -10)**2);
-                    if(dist > 25) {
-                        valid = true;
-                        for(var t=0; t<trees.length; t++) {
-                            if(Math.hypot(x-trees[t].x, z-trees[t].z) < 5) { valid = false; break; }
+            // Végétation (Arbres Decor & Bush Sol)
+            function createVegetation() {
+                var container = document.querySelector("#vegetation");
+                var treeCount = 32;
+                var trees = [];
+
+                for (var i = 0; i < treeCount; i++) {
+                    var valid = false,
+                        attempts = 0;
+                    var x, z;
+                    while (!valid && attempts < 50) {
+                        x = (Math.random() - 0.5) * 80;
+                        z = (Math.random() - 0.5) * 80;
+                        var dist = Math.sqrt((x - 0) ** 2 + (z - -10) ** 2);
+                        if (dist > 25) {
+                            valid = true;
+                            for (var t = 0; t < trees.length; t++) {
+                                if (
+                                    Math.hypot(x - trees[t].x, z - trees[t].z) <
+                                    5
+                                ) {
+                                    valid = false;
+                                    break;
+                                }
+                            }
                         }
+                        attempts++;
                     }
-                    attempts++;
+                    if (valid) {
+                        trees.push({ x: x, z: z });
+                        var tree = document.createElement("a-entity");
+                        tree.setAttribute("mixin", "treeMixin");
+                        var s = (1.0 + Math.random() * 1.5) * 3;
+                        tree.setAttribute("position", { x: x, y: s * 1, z: z });
+                        tree.setAttribute("scale", { x: s, y: s, z: s });
+                        tree.setAttribute("rotation", {
+                            x: 0,
+                            y: Math.random() * 360,
+                            z: 0,
+                        });
+                        container.appendChild(tree);
+                    }
                 }
-                if(valid) {
-                    trees.push({x:x, z:z});
-                    var tree = document.createElement('a-entity');
-                    tree.setAttribute('mixin', 'treeMixin');
-                    var s = (1.0 + Math.random() * 1.5) * 3;
-                    tree.setAttribute('position', {x: x, y: s * 1, z: z});
-                    tree.setAttribute('scale', {x: s, y: s, z: s});
-                    tree.setAttribute('rotation', {x: 0, y: Math.random()*360, z: 0});
-                    container.appendChild(tree);
-                }
-            }
 
-            // BUSHES
-            var bushCount = 80;
-            var isForbidden = function(x, z) {
-                return (x > -12 && x < 20 && z > -20 && z < -5);
-            };
-
-            for(var k=0; k<bushCount; k++) {
-                var x = (Math.random() - 0.5) * 70;
-                var z = (Math.random() - 0.5) * 70;
-                if(!isForbidden(x,z)) {
-                   var bush = document.createElement('a-entity');
-                   bush.setAttribute('mixin', 'bushMixin');
-                   bush.setAttribute('position', {x: x, y: 0, z: z});
-                   var s = 0.5 + Math.random() * 0.5;
-                   bush.setAttribute('scale', {x: s, y: s, z: s});
-                   bush.setAttribute('rotation', {x: 0, y: Math.random()*360, z: 0});
-                   container.appendChild(bush);
-                }
-            }
-
-            // Herbe & Batons
-            var grassCount = 150; 
-            for(var j=0; j<grassCount; j++) {
-                var angleG = Math.random() * Math.PI * 2;
-                var radiusG = 2 + Math.random() * 45;
-                var xG = Math.cos(angleG) * radiusG;
-                var zG = Math.sin(angleG) * radiusG;
-                var grass = document.createElement('a-entity');
-                grass.setAttribute('mixin', 'grassMixin');
-                grass.setAttribute('position', {x: xG, y: 0, z: zG});
-                grass.setAttribute('rotation', {x: 0, y: Math.random()*360, z: 0});
-                container.appendChild(grass);
-            }
-
-             // Batons (Loot)
-             var stickCount = 10;
-            for(var l=0; l<stickCount; l++) {
-                var x = (Math.random() - 0.5) * 60;
-                var z = (Math.random() - 0.5) * 60;
-                if(!isForbidden(x,z)) {
-                    var stick = document.createElement('a-entity');
-                    stick.setAttribute('mixin', 'stickMixin');
-                    stick.setAttribute('position', {x: x, y: 0.1, z: z}); 
-                    stick.setAttribute('rotation', {x: 90, y: Math.random()*360, z: 0});
-                    container.appendChild(stick);
-                }
-            }
-        }
-
-        // Animation Gnous (6) - INTELLIGENTE + ANTI_COLLISION (Verssion Corrigée)
-        function animateGnous() {
-            var gnous = [
-                { el: document.querySelector('#gnou1'), speed: 0.8, state: 'walk', waitTimer: 0, target: null },
-                { el: document.querySelector('#gnou2'), speed: 0.6, state: 'walk', waitTimer: 0, target: null },
-                { el: document.querySelector('#gnou3'), speed: 0.9, state: 'walk', waitTimer: 0, target: null },
-                { el: document.querySelector('#gnou4'), speed: 0.7, state: 'walk', waitTimer: 0, target: null },
-                { el: document.querySelector('#gnou5'), speed: 1.0, state: 'walk', waitTimer: 0, target: null },
-                { el: document.querySelector('#gnou6'), speed: 0.85, state: 'walk', waitTimer: 0, target: null }
-            ];
-
-            function getRandomPoint() {
-                return {
-                    x: Math.max(0.5, Math.min(7.5, Math.random() * 8)),
-                    z: Math.max(1.5, Math.min(6.5, 1 + Math.random() * 6))
+                // BUSHES
+                var bushCount = 80;
+                var isForbidden = function (x, z) {
+                    return x > -12 && x < 20 && z > -20 && z < -5;
                 };
+
+                for (var k = 0; k < bushCount; k++) {
+                    var x = (Math.random() - 0.5) * 70;
+                    var z = (Math.random() - 0.5) * 70;
+                    if (!isForbidden(x, z)) {
+                        var bush = document.createElement("a-entity");
+                        bush.setAttribute("mixin", "bushMixin");
+                        bush.setAttribute("position", { x: x, y: 0, z: z });
+                        var s = 0.5 + Math.random() * 0.5;
+                        bush.setAttribute("scale", { x: s, y: s, z: s });
+                        bush.setAttribute("rotation", {
+                            x: 0,
+                            y: Math.random() * 360,
+                            z: 0,
+                        });
+                        container.appendChild(bush);
+                    }
+                }
+
+                // Herbe & Batons
+                var grassCount = 150;
+                for (var j = 0; j < grassCount; j++) {
+                    var angleG = Math.random() * Math.PI * 2;
+                    var radiusG = 2 + Math.random() * 45;
+                    var xG = Math.cos(angleG) * radiusG;
+                    var zG = Math.sin(angleG) * radiusG;
+                    var grass = document.createElement("a-entity");
+                    grass.setAttribute("mixin", "grassMixin");
+                    grass.setAttribute("position", { x: xG, y: 0, z: zG });
+                    grass.setAttribute("rotation", {
+                        x: 0,
+                        y: Math.random() * 360,
+                        z: 0,
+                    });
+                    container.appendChild(grass);
+                }
+
+                // Batons (Loot)
+                var stickCount = 10;
+                for (var l = 0; l < stickCount; l++) {
+                    var x = (Math.random() - 0.5) * 60;
+                    var z = (Math.random() - 0.5) * 60;
+                    if (!isForbidden(x, z)) {
+                        var stick = document.createElement("a-entity");
+                        stick.setAttribute("mixin", "stickMixin");
+                        stick.setAttribute("position", { x: x, y: 0.1, z: z });
+                        stick.setAttribute("rotation", {
+                            x: 90,
+                            y: Math.random() * 360,
+                            z: 0,
+                        });
+                        container.appendChild(stick);
+                    }
+                }
             }
 
-            gnous.forEach(g => { 
-                if(g.el) {
-                    g.target = getRandomPoint();
-                    g.el.setAttribute('animation-mixer', 'clip: *walk*; loop: repeat; timeScale: 1.0');
+            // Animation Gnous (6) - INTELLIGENTE + ANTI_COLLISION (Verssion Corrigée)
+            function animateGnous() {
+                var gnous = [
+                    {
+                        el: document.querySelector("#gnou1"),
+                        speed: 0.8,
+                        state: "walk",
+                        waitTimer: 0,
+                        target: null,
+                    },
+                    {
+                        el: document.querySelector("#gnou2"),
+                        speed: 0.6,
+                        state: "walk",
+                        waitTimer: 0,
+                        target: null,
+                    },
+                    {
+                        el: document.querySelector("#gnou3"),
+                        speed: 0.9,
+                        state: "walk",
+                        waitTimer: 0,
+                        target: null,
+                    },
+                    {
+                        el: document.querySelector("#gnou4"),
+                        speed: 0.7,
+                        state: "walk",
+                        waitTimer: 0,
+                        target: null,
+                    },
+                    {
+                        el: document.querySelector("#gnou5"),
+                        speed: 1.0,
+                        state: "walk",
+                        waitTimer: 0,
+                        target: null,
+                    },
+                    {
+                        el: document.querySelector("#gnou6"),
+                        speed: 0.85,
+                        state: "walk",
+                        waitTimer: 0,
+                        target: null,
+                    },
+                ];
+
+                function getRandomPoint() {
+                    return {
+                        x: Math.max(0.5, Math.min(7.5, Math.random() * 8)),
+                        z: Math.max(1.5, Math.min(6.5, 1 + Math.random() * 6)),
+                    };
                 }
-            });
 
-            function loop() {
-                requestAnimationFrame(loop);
-                
-                gnous.forEach(function(item) {
-                     var g = item.el;
-                     if(!g || !g.object3D) return;
-
-                     var pos = g.object3D.position;
-
-                     if(pos.x < 0 || pos.x > 8 || pos.z < 1 || pos.z > 7) {
-                         pos.x = Math.max(0.1, Math.min(7.9, pos.x));
-                         pos.z = Math.max(1.1, Math.min(6.9, pos.z));
-                         item.target = getRandomPoint();
-                     }
-
-                     if(item.state === 'wait') {
-                         item.waitTimer -= 0.016; 
-                         if(item.waitTimer <= 0) {
-                             item.state = 'walk';
-                             item.target = getRandomPoint();
-                             g.setAttribute('animation-mixer', 'timeScale', 1.0);
-                         } else {
-                             g.setAttribute('animation-mixer', 'timeScale', 0);
-                         }
-                     }
-                     else if(item.state === 'walk') {
-                        g.setAttribute('animation-mixer', 'timeScale', 1.0);
-                        var dx = item.target.x - pos.x;
-                        var dz = item.target.z - pos.z;
-                        var dist = Math.sqrt(dx*dx + dz*dz);
-                        if(dist < 0.2) {
-                            item.state = 'wait';
-                            item.waitTimer = 1.0 + Math.random() * 2.0; 
-                        } else {
-                            var moveStep = item.speed * 0.02;
-                            pos.x += (dx / dist) * moveStep;
-                            pos.z += (dz / dist) * moveStep;
-                            var angle = Math.atan2(dx, dz); 
-                            g.object3D.rotation.y = angle + Math.PI; 
-                        }
-                     }
+                gnous.forEach((g) => {
+                    if (g.el) {
+                        g.target = getRandomPoint();
+                        g.el.setAttribute(
+                            "animation-mixer",
+                            "clip: *walk*; loop: repeat; timeScale: 1.0",
+                        );
+                    }
                 });
 
-                for(var i=0; i<gnous.length; i++) {
-                    for(var j=i+1; j<gnous.length; j++) {
-                        var g1 = gnous[i];
-                        var g2 = gnous[j];
-                        if(!g1.el || !g2.el || !g1.el.object3D || !g2.el.object3D) continue;
-                        var p1 = g1.el.object3D.position;
-                        var p2 = g2.el.object3D.position;
-                        var dist = Math.sqrt((p1.x - p2.x)**2 + (p1.z - p2.z)**2);
-                        if(dist < 1.0) {
-                            g1.target = getRandomPoint();
-                            g2.target = getRandomPoint();
-                            var pushX = (p1.x - p2.x) * 0.05;
-                            var pushZ = (p1.z - p2.z) * 0.05;
-                            p1.x += pushX; p1.z += pushZ;
-                            p2.x -= pushX; p2.z -= pushZ;
+                function loop() {
+                    requestAnimationFrame(loop);
+
+                    gnous.forEach(function (item) {
+                        var g = item.el;
+                        if (!g || !g.object3D) return;
+
+                        var pos = g.object3D.position;
+
+                        if (pos.x < 0 || pos.x > 8 || pos.z < 1 || pos.z > 7) {
+                            pos.x = Math.max(0.1, Math.min(7.9, pos.x));
+                            pos.z = Math.max(1.1, Math.min(6.9, pos.z));
+                            item.target = getRandomPoint();
+                        }
+
+                        if (item.state === "wait") {
+                            item.waitTimer -= 0.016;
+                            if (item.waitTimer <= 0) {
+                                item.state = "walk";
+                                item.target = getRandomPoint();
+                                g.setAttribute(
+                                    "animation-mixer",
+                                    "timeScale",
+                                    1.0,
+                                );
+                            } else {
+                                g.setAttribute(
+                                    "animation-mixer",
+                                    "timeScale",
+                                    0,
+                                );
+                            }
+                        } else if (item.state === "walk") {
+                            g.setAttribute("animation-mixer", "timeScale", 1.0);
+                            var dx = item.target.x - pos.x;
+                            var dz = item.target.z - pos.z;
+                            var dist = Math.sqrt(dx * dx + dz * dz);
+                            if (dist < 0.2) {
+                                item.state = "wait";
+                                item.waitTimer = 1.0 + Math.random() * 2.0;
+                            } else {
+                                var moveStep = item.speed * 0.02;
+                                pos.x += (dx / dist) * moveStep;
+                                pos.z += (dz / dist) * moveStep;
+                                var angle = Math.atan2(dx, dz);
+                                g.object3D.rotation.y = angle + Math.PI;
+                            }
+                        }
+                    });
+
+                    for (var i = 0; i < gnous.length; i++) {
+                        for (var j = i + 1; j < gnous.length; j++) {
+                            var g1 = gnous[i];
+                            var g2 = gnous[j];
+                            if (
+                                !g1.el ||
+                                !g2.el ||
+                                !g1.el.object3D ||
+                                !g2.el.object3D
+                            )
+                                continue;
+                            var p1 = g1.el.object3D.position;
+                            var p2 = g2.el.object3D.position;
+                            var dist = Math.sqrt(
+                                (p1.x - p2.x) ** 2 + (p1.z - p2.z) ** 2,
+                            );
+                            if (dist < 1.0) {
+                                g1.target = getRandomPoint();
+                                g2.target = getRandomPoint();
+                                var pushX = (p1.x - p2.x) * 0.05;
+                                var pushZ = (p1.z - p2.z) * 0.05;
+                                p1.x += pushX;
+                                p1.z += pushZ;
+                                p2.x -= pushX;
+                                p2.z -= pushZ;
+                            }
                         }
                     }
                 }
+                loop();
             }
-            loop(); 
-        }
 
-        // Lancement au chargement
-        window.addEventListener('load', function () {
-            // Do nothing here, wait for login
-        });
-    </script>
-</body>
+            // Lancement au chargement
+            window.addEventListener("load", function () {
+                // Do nothing here, wait for login
+            });
+        </script>
+    </body>
 </html>
