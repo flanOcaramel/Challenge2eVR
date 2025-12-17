@@ -34,15 +34,20 @@
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
         
-        // Plaine verte
+        // Sol avec texture d'herbe
+        const textureLoader = new THREE.TextureLoader();
+        const grassTexture = textureLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/terrain/grasslight-big.jpg');
+        grassTexture.wrapS = THREE.RepeatWrapping;
+        grassTexture.wrapT = THREE.RepeatWrapping;
+        grassTexture.repeat.set(20, 20);
         const planeGeometry = new THREE.PlaneGeometry(100, 100);
-        const planeMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 }); // Vert forêt
+        const planeMaterial = new THREE.MeshLambertMaterial({ map: grassTexture });
         const plane = new THREE.Mesh(planeGeometry, planeMaterial);
         plane.rotation.x = -Math.PI / 2; // Allonger horizontalement
         scene.add(plane);
 
         // Fonction pour créer un arbre
-        function createTree(x, z) {
+        function createTree(x, z, type) {
             // Tronc
             const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.2, 2);
             const trunkMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
@@ -51,7 +56,12 @@
             scene.add(trunk);
 
             // Feuillage
-            const leavesGeometry = new THREE.SphereGeometry(1);
+            let leavesGeometry;
+            if (type === 'sphere') {
+                leavesGeometry = new THREE.SphereGeometry(1);
+            } else if (type === 'cone') {
+                leavesGeometry = new THREE.ConeGeometry(1, 2, 8);
+            }
             const leavesMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
             const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
             leaves.position.set(x, 2.5, z);
@@ -59,11 +69,13 @@
         }
 
 
-        createTree(10, 10);
-        createTree(-15, 5);
-        createTree(20, -10);
-        createTree(-5, -20);
-        createTree(0, 15);
+        // Ajouter une vingtaine d'arbres
+        for (let i = 0; i < 20; i++) {
+            const x = (Math.random() - 0.5) * 80;
+            const z = (Math.random() - 0.5) * 80;
+            const type = Math.random() > 0.5 ? 'sphere' : 'cone';
+            createTree(x, z, type);
+        }
         
         // Lumière
         const light = new THREE.DirectionalLight(0xffffff, 1);
