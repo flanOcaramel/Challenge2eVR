@@ -1,0 +1,117 @@
+/* --- MAIN THEME : Dark & Premium --- */
+:root {
+    --bg-deep: #0f172a; /* Slate 900 */
+    --bg-card: rgba(30, 41, 59, 0.7); /* Slate 800 semi-transparent */
+    --border-light: rgba(255, 255, 255, 0.1);
+    --accent-color: #6366f1; /* Indigo */
+    --text-white: #f8fafc;
+    --text-gray: #cbd5e1;
+    
+    --font-title: 'Outfit', sans-serif;
+    --font-text: 'Inter', sans-serif;
+}
+
+body {
+    background: linear-gradient(to bottom right, #0f172a, #1e293b);
+    background-attachment: fixed;
+    font-family: var(--font-text);
+    color: var(--text-white);
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* --- Login Card --- */
+.login-card {
+    background: var(--bg-card);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-light);
+    padding: 3rem;
+    border-radius: 20px;
+    width: 100%;
+    max-width: 450px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    text-align: center;
+}
+
+.login-title {
+    font-family: var(--font-title);
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 2rem;
+    color: white;
+    letter-spacing: 0.5px;
+}
+
+/* --- Form Elements --- */
+.form-group {
+    margin-bottom: 1.5rem;
+    text-align: left;
+}
+
+.form-control {
+    width: 100%;
+    padding: 1rem;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    color: white;
+    font-family: var(--font-text);
+    font-size: 1rem;
+    outline: none;
+    transition: all 0.2s;
+    box-sizing: border-box; /* Important so padding doesn't break width */
+}
+
+/* Specific style for select dropdown arrow matches theme */
+select.form-control {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23cbd5e1%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem top 50%;
+    background-size: 0.65rem auto;
+    cursor: pointer;
+}
+
+/* Styles for options in the select (browsers limit styling here, but bg color works) */
+select.form-control option {
+    background-color: #0f172a;
+    color: white;
+}
+
+.form-control:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.btn-login {
+    width: 100%;
+    padding: 1rem;
+    margin-top: 1rem;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.btn-login:hover {
+    background: #4f46e5;
+    transform: translateY(-2px);
+}
+
+.btn-login:active {
+    transform: translateY(0);
+}
+
+#loginMessage {
+    margin-top: 1.5rem;
+    min-height: 1.5rem;
+    font-size: 0.9rem;
+    color: #ef4444; /* Error Red */
+}
