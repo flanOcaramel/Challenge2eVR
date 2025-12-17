@@ -23,6 +23,7 @@
     <!-- Custom User Scripts -->
     <!-- Custom User Scripts -->
     <script src="./assets/js/christmas-utils.js"></script>
+    <script src="https://unpkg.com/super-hands@^3.0.3/dist/super-hands.min.js"></script> <!-- Super Hands -->
     <!-- Script introuvable : <script src="./research/physics-ammo/move-objects-ph3.js"></script> -->
 
     <script>
@@ -97,15 +98,15 @@
             <!-- Mixins Christmas (Image User) -->
             <a-mixin id="coal" material="color:black" 
                      geometry="primitive:sphere; segments-height:7; segments-width:13; radius:0.04"
-                     movement="type:grabbable; stickiness:stickable"
+                     hoverable grabbable stretchable draggable
                      ammo-shape="type:sphere; fit:manual; sphereRadius:0.04"
-                     ammo-body="type:dynamic; mass:0.1">
+                     ammo-body="type:dynamic; mass:1">
             </a-mixin>
             <a-mixin id="branch" material="color:#5C4033" 
-                     geometry="primitive:branch" scale="0.2 0.2 0.2"
-                     movement="type:grabbable; stickiness:stickable"
-                     ammo-shape="type:hull"
-                     ammo-body="type:dynamic; mass:0.1">
+                     geometry="primitive:box; height:0.03; width:0.5; depth:0.03"
+                     hoverable grabbable stretchable draggable
+                     ammo-shape="type:box; fit:manual; halfExtents:0.25 0.015 0.015"
+                     ammo-body="type:dynamic; mass:0.5">
             </a-mixin>
 
             <!-- Mixin Arbre (Décor) -->
@@ -193,32 +194,45 @@
                   ammo-body="type: static" ammo-shape="type: hull"></a-entity>
 
         <!-- 5. LA CAISSE SPÉCIALE INTERACTIVE -->
-        <a-entity position="-6 0 -11"> 
-            <!-- Caisse en bois -->
-            <a-entity gltf-model="#crateModel" 
-                id="mainCrate"
-                scale="1 1 1"
-                ammo-body="type: static" 
-                ammo-shape="type: box"
-                movement="type: static; stickiness: sticky" 
-                position="0 0 0">
-            </a-entity>
-
-            <!-- Objets posés SUR la caisse -->
-            <!-- Chapeau : Taille réduite (0.2) et posé dessus -->
-            <a-entity mixin="hatMixin" position="0 1.0 0" scale="0.2 0.2 0.2"></a-entity>
-            <!-- Baton -->
-            <a-entity mixin="stickMixin" position="0.5 1.0 0.2" rotation="0 90 0"></a-entity>
-            <!-- 3. Coal & Branch (Nouveaux) -->
-            <a-entity mixin="coal" position="-0.3 1.05 0.2"></a-entity>
-            <a-entity mixin="branch" position="0.3 1.02 -0.2" rotation="90 0 0"></a-entity>
+        
+        <!-- Caisse en bois (Absolu) -->
+        <!-- Caisse en bois (Absolu) -->
+        <a-entity gltf-model="#crateModel" 
+            id="mainCrate"
+            scale="1 1 1"
+            position="-6 0 -11"
+            ammo-body="type: static" 
+            ammo-shape="type: box"
+            movement="type: static; stickiness: sticky">
         </a-entity>
 
-        <!-- 6. JOUEUR (RIG CAMERA) -->
+        <!-- Objets posés AU SOL (pour test grab) -->
+        <!-- Au pied de la caisse, prêts à être ramassés -->
+        
+        <!-- 1. Coal -->
+        <a-entity mixin="coal" position="-5.5 0.5 -10.5" scale="1 1 1"></a-entity>
+        
+        <!-- 2. Branch -->
+        <a-entity mixin="branch" position="-6.5 0.5 -10.5" rotation="0 45 0" scale="1 1 1"></a-entity>
+
+        <!-- 6. JOUEUR (RIG CAMERA) avec SUPER HANDS -->
         <a-entity id="rig">
             <a-camera id="camera" position="0 1.6 0" look-controls wasd-controls></a-camera>
-            <a-entity id="lhand" hand-controls="hand: left" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: [ammo-shape]" visible="true"></a-entity>
-            <a-entity id="rhand" hand-controls="hand: right" visible="true"></a-entity>
+            
+            <!-- Main Gauche (Teleport + Grab) -->
+            <a-entity id="lhand" 
+                hand-controls="hand: left" 
+                teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: [ammo-shape]" 
+                sphere-collider="objects: [mixin~='coal'], [mixin~='branch']"
+                super-hands="colliderEvent: hit; colliderEventProperty: els; colliderEndEvent: hitend; colliderEndEventProperty: clearedEls">
+            </a-entity>
+            
+            <!-- Main Droite (Grab) -->
+            <a-entity id="rhand" 
+                hand-controls="hand: right"
+                sphere-collider="objects: [mixin~='coal'], [mixin~='branch']"
+                super-hands="colliderEvent: hit; colliderEventProperty: els; colliderEndEvent: hitend; colliderEndEventProperty: clearedEls">
+            </a-entity>
         </a-entity>
     
     </a-scene>
