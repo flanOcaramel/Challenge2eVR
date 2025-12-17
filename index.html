@@ -175,17 +175,13 @@
             <a-entity gltf-model="#fenceModel" position="10 0 2" rotation="0 90 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
             <a-entity gltf-model="#fenceModel" position="10 0 6" rotation="0 90 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
             
-            <!-- 5 Gnous (Wildebeests) -->
-            <a-entity id="gnou1" gltf-model="#wildebeestModel" position="4 0 4" scale="0.7 0.7 0.7" animation-mixer="clip: *walk*; loop: repeat; timeScale: 1.0"></a-entity>
-            <a-entity id="gnou2" gltf-model="#wildebeestModel" position="5 0 5" scale="0.7 0.7 0.7" animation-mixer="clip: *walk*; loop: repeat; timeScale: 0.9"></a-entity>
-            <a-entity id="gnou3" gltf-model="#wildebeestModel" position="3 0 5" scale="0.7 0.7 0.7" animation-mixer="clip: *walk*; loop: repeat; timeScale: 1.1"></a-entity>
-            <a-entity id="gnou4" gltf-model="#wildebeestModel" position="5 0 3" scale="0.7 0.7 0.7" animation-mixer="clip: *walk*; loop: repeat; timeScale: 1.05"></a-entity>
-            <a-entity id="gnou5" gltf-model="#wildebeestModel" position="3 0 3" scale="0.7 0.7 0.7" animation-mixer="clip: *walk*; loop: repeat; timeScale: 0.95"></a-entity>
-            <a-entity id="gnou1" gltf-model="#wildebeestModel" position="4 0 4" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 1.0"></a-entity>
+            <!-- 6 Gnous (Wildebeests) -->
+            <a-entity id="gnou1" gltf-model="#wildebeestModel" position="4 0 4" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 0.8"></a-entity>
             <a-entity id="gnou2" gltf-model="#wildebeestModel" position="5 0 5" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 0.9"></a-entity>
-            <a-entity id="gnou3" gltf-model="#wildebeestModel" position="3 0 5" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 1.1"></a-entity>
-            <a-entity id="gnou4" gltf-model="#wildebeestModel" position="5 0 3" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 1.05"></a-entity>
-            <a-entity id="gnou5" gltf-model="#wildebeestModel" position="3 0 3" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 0.95"></a-entity>
+            <a-entity id="gnou3" gltf-model="#wildebeestModel" position="3 0 5" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 0.85"></a-entity>
+            <a-entity id="gnou4" gltf-model="#wildebeestModel" position="6 0 3" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 0.75"></a-entity>
+            <a-entity id="gnou5" gltf-model="#wildebeestModel" position="2 0 4" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 1.0"></a-entity>
+            <a-entity id="gnou6" gltf-model="#wildebeestModel" position="4 0 2" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 0.95"></a-entity>
         </a-entity>
 
         <!-- Végétation & Loot -->
@@ -344,42 +340,107 @@
             }
         }
 
-        // Animation Gnous (5)
+        // Animation Gnous (6) - INTELLIGENTE + ANTI_COLLISION
         function animateGnous() {
             var gnous = [
-                document.querySelector('#gnou1'),
-                document.querySelector('#gnou2'),
-                document.querySelector('#gnou3'),
-                document.querySelector('#gnou4'),
-                document.querySelector('#gnou5')
+                { el: document.querySelector('#gnou1'), speed: 0.8, state: 'walk', waitTimer: 0, target: null },
+                { el: document.querySelector('#gnou2'), speed: 0.6, state: 'walk', waitTimer: 0, target: null },
+                { el: document.querySelector('#gnou3'), speed: 0.9, state: 'walk', waitTimer: 0, target: null },
+                { el: document.querySelector('#gnou4'), speed: 0.7, state: 'walk', waitTimer: 0, target: null },
+                { el: document.querySelector('#gnou5'), speed: 1.0, state: 'walk', waitTimer: 0, target: null },
+                { el: document.querySelector('#gnou6'), speed: 0.85, state: 'walk', waitTimer: 0, target: null }
             ];
 
+            // Limites strictes de l"enclos (0 à 8, 1 à 7)
+            function getRandomPoint() {
+                return {
+                    x: Math.max(0.5, Math.min(7.5, Math.random() * 8)),
+                    z: Math.max(1.5, Math.min(6.5, 1 + Math.random() * 6))
+                };
+            }
+
+            // Init
+            gnous.forEach(g => { 
+                g.target = getRandomPoint();
+                g.el.setAttribute('animation-mixer', 'clip: *walk*; loop: repeat; timeScale: 1.0');
+            });
+
             var t = 0;
-            setInterval(function() {
-                t += 0.02;
-                gnous.forEach(function(g, index) {
-                    if(g && g.object3D) {
-                        // Varie Rayon et Phase
-                        var offset = index * (Math.PI * 2 / 5);
-                        var r = 2.5 + (index % 2) * 1; 
-                        
-                        var x = 4 + Math.cos(t * 0.5 + offset) * r;
-                        var z = 4 + Math.sin(t * 0.5 + offset) * r;
-                        
-                        g.object3D.position.set(x, 0, z);
-                        // Orientation: Regarder vers l'avant de la marche
-                        // Tangente au cercle
-                        var angle = t * 0.5 + offset;
-                        // En A-Frame Rotation Y: 0 = -Z, 90 = -X...
-                        // Angle maths: 0 = +X.
-                        // Pour regarder "devant" sur le cercle trigonométrique (sens anti-horaire):
-                        // Rotation = -Angle + PI (ou similaire).
-                        // On ajuste expérimentalement si "à l'envers".
-                        // Essayons Rotation Y = -Angle
-                        g.object3D.rotation.y = -angle;
-                    }
+            function loop() {
+                requestAnimationFrame(loop);
+                
+                // 1. Mouvement
+                gnous.forEach(function(item) {
+                     var g = item.el;
+                     if(!g || !g.object3D) return;
+
+                     var pos = g.object3D.position;
+
+                     // Check Sortie Enclos (Sécurité)
+                     if(pos.x < 0 || pos.x > 8 || pos.z < 1 || pos.z > 7) {
+                         // Hors limites : Retourne au centre
+                         pos.x = Math.max(0.1, Math.min(7.9, pos.x));
+                         pos.z = Math.max(1.1, Math.min(6.9, pos.z));
+                         item.target = getRandomPoint();
+                     }
+
+                     if(item.state === 'wait') {
+                         item.waitTimer -= 0.016; 
+                         if(item.waitTimer <= 0) {
+                             item.state = 'walk';
+                             item.target = getRandomPoint();
+                             g.setAttribute('animation-mixer', 'timeScale', 1.0);
+                         } else {
+                             g.setAttribute('animation-mixer', 'timeScale', 0);
+                         }
+                     }
+                     else if(item.state === 'walk') {
+                        g.setAttribute('animation-mixer', 'timeScale', 1.0);
+
+                        var dx = item.target.x - pos.x;
+                        var dz = item.target.z - pos.z;
+                        var dist = Math.sqrt(dx*dx + dz*dz);
+
+                        if(dist < 0.2) {
+                            item.state = 'wait';
+                            item.waitTimer = 1.0 + Math.random() * 2.0; 
+                        } else {
+                            var moveStep = item.speed * 0.02;
+                            pos.x += (dx / dist) * moveStep;
+                            pos.z += (dz / dist) * moveStep;
+                            
+                            var angle = Math.atan2(dx, dz); 
+                            g.object3D.rotation.y = angle + Math.PI; 
+                        }
+                     }
                 });
-            }, 50);
+
+                // 2. Anti-Collision Gnou vs Gnou
+                for(var i=0; i<gnous.length; i++) {
+                    for(var j=i+1; j<gnous.length; j++) {
+                        var g1 = gnous[i];
+                        var g2 = gnous[j];
+                        if(!g1.el.object3D || !g2.el.object3D) continue;
+
+                        var p1 = g1.el.object3D.position;
+                        var p2 = g2.el.object3D.position;
+                        var dist = Math.sqrt((p1.x - p2.x)**2 + (p1.z - p2.z)**2);
+
+                        // Si trop proches (< 1.2m)
+                        if(dist < 1.0) {
+                            // On change leurs cibles immédiatement pour les éloigner
+                            g1.target = getRandomPoint();
+                            g2.target = getRandomPoint();
+                            // Petit "rebond" pour décoller
+                            var pushX = (p1.x - p2.x) * 0.05;
+                            var pushZ = (p1.z - p2.z) * 0.05;
+                            p1.x += pushX; p1.z += pushZ;
+                            p2.x -= pushX; p2.z -= pushZ;
+                        }
+                    }
+                }
+            }
+            loop(); 
         }
 
         // Lancement au chargement
