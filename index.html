@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>La Prairie Pluvieuse - VR</title>
+    <meta name="description" content="Environnement VR immersif avec physique">
+    
+    <!-- 1. IMPORT A-FRAME & LIBRARIES -->
+    <!-- A-Frame Core -->
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    
+    <!-- A-Frame Extras (Animation, Controls, etc.) -->
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.0.0/dist/aframe-extras.min.js"></script>
+
+    <!-- Physics System (Ammo Driver) -->
+    <!-- Note: Ammo.js wasm loader config usually handled by aframe-physics-system, but explicit load can be safer -->
+    <script src="https://cdn.jsdelivr.net/gh/MozillaReality/ammo.js@8bbc0ea/builds/ammo.wasm.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-physics-system@v4.2.2/dist/aframe-physics-system.min.js"></script>
+    
+    <!-- Teleport Controls -->
+    <script src="https://rawgit.com/fernsroth/aframe-teleport-controls/master/dist/aframe-teleport-controls.min.js"></script>
+
+    <!-- Custom User Scripts -->
+    <script src="./Challenge2eVR/assets/js/christmas-utils.js"></script>
+    <!-- Script introuvable : <script src="./research/physics-ammo/move-objects-ph3.js"></script> -->
+
+    <script>
+        // Configuration simple pour la pluie (sera lancée plus bas)
+        AFRAME.registerComponent('rain-drop', {
+            init: function() {
+                this.reset();
+            },
+            tick: function() {
+                this.el.object3D.position.y -= 0.1;
+                if (this.el.object3D.position.y < 0) {
+                    this.reset();
+                }
+            },
+            reset: function() {
+                // Position aléatoire autour du joueur (zone 20x20)
+                var x = (Math.random() - 0.5) * 20;
+                var z = (Math.random() - 0.5) * 20;
+                var y = 10 + Math.random() * 5;
+                this.el.object3D.position.set(x, y, z);
+            }
+        });
+    </script>
+</head>
+<body>
+    <!-- Config Scene avec Physique Ammo -->
+    <a-scene 
+        physics="driver: ammo; debug: false; gravity: -9.8"
+        fog="type: exponential; color: #87CEEB; density: 0.015"
+        renderer="antialias: true; colorManagement: true;">
+
+        <!-- 2. ASSETS -->
+        <a-assets>
+            <!-- Texture Sol supprimée (Aperçu uniquement) -->
+            <!-- <img id="groundTexture" src="./Challenge2eVR/assets/img/prairie.jpg"> -->
+            
+            <!-- Modèles 3D -->
+            <a-asset-item id="grassModel" src="./Challenge2eVR/assets/objects/Grass.glb"></a-asset-item>
+            <a-asset-item id="barnModel" src="./Challenge2eVR/assets/objects/wooden_barn.glb"></a-asset-item>
+            <a-asset-item id="fenceModel" src="./Challenge2eVR/assets/objects/fence.glb"></a-asset-item>
+            <a-asset-item id="wildebeestModel" src="./Challenge2eVR/assets/objects/wildebeest.glb"></a-asset-item>
+            <a-asset-item id="shrubModel" src="./Challenge2eVR/assets/objects/Shrub.glb"></a-asset-item>
+            <a-asset-item id="stickModel" src="./Challenge2eVR/assets/objects/Stick.glb"></a-asset-item>
+            <a-asset-item id="crateModel" src="./Challenge2eVR/assets/objects/Crate.glb"></a-asset-item>
+            <a-asset-item id="hatModel" src="./Challenge2eVR/assets/objects/hat.glb"></a-asset-item>
+            <a-asset-item id="cloudModel" src="./Challenge2eVR/assets/objects/Cloud.glb"></a-asset-item>
+            <a-asset-item id="sunModel" src="./Challenge2eVR/assets/objects/Sun.glb"></a-asset-item>
+
+            <!-- Mixins Physiques & Interactions -->
+            <!-- Objet attrapable standard -->
+            <a-mixin id="grabbable" 
+                movement="type: grabbable; stickiness: stickable"
+                ammo-shape="type: hull"
+                ammo-body="type: dynamic; mass: 1">
+            </a-mixin>
+
+            <a-mixin id="grassMixin" gltf-model="#grassModel" scale="0.1 0.1 0.1"></a-mixin>
+
+            <!-- Mixin pour le baton -->
+            <a-mixin id="stickMixin" 
+                gltf-model="#stickModel" 
+                scale="1 1 1"
+                mixin="grabbable">
+            </a-mixin>
+
+            <!-- Mixin pour le chapeau -->
+            <a-mixin id="hatMixin"
+                gltf-model="#hatModel"
+                scale="1 1 1"
+                mixin="grabbable">
+            </a-mixin>
+
+            <!-- Mixin Arbuste -->
+            <a-mixin id="shrubMixin"
+                gltf-model="#shrubModel"
+                scale="0.5 0.5 0.5"
+                ammo-body="type: static" 
+                ammo-shape="type: hull">
+            </a-mixin>
+        </a-assets>
+
+        <!-- 3. ENVIRONNEMENT -->
+        <!-- Ciel -->
+        <a-sky color="#B0E0E6"></a-sky>
+
+        <!-- Soleil -->
+        <a-entity gltf-model="#sunModel" position="-20 50 -30" scale="5 5 5"></a-entity>
+        
+        <!-- Lumière -->
+        <a-entity light="type: ambient; color: #BBB; intensity: 0.6"></a-entity>
+        <a-entity light="type: directional; color: #FFF; intensity: 0.8; castShadow: true" position="-1 1 0.5"></a-entity>
+
+        <!-- Nuages dispersés -->
+        <a-entity gltf-model="#cloudModel" position="-10 20 -5" scale="2 2 2"></a-entity>
+        <a-entity gltf-model="#cloudModel" position="15 25 10" scale="3 3 3"></a-entity>
+        <a-entity gltf-model="#cloudModel" position="0 22 -20" scale="2.5 2.5 2.5"></a-entity>
+
+        <!-- Sol -->
+        <a-plane 
+            color="#66c166"
+            rotation="-90 0 0" 
+            width="100" 
+            height="100" 
+            material="roughness: 1; metalness: 0"
+            ammo-body="type: static" 
+            ammo-shape="type: box"
+            shadow="receive: true">
+        </a-plane>
+
+        <!-- 4. ÉLÉMENTS SCÉNIQUES -->
+        <!-- Hangar : Fix erreur FIT.ALL en utilisant box au lieu de mesh pour la collision (plus stable) -->
+        <a-entity gltf-model="#barnModel" position="-10 0 -15" scale="2 2 2" 
+            ammo-body="type: static" 
+            ammo-shape="type: box; fit: manual; halfExtents: 5 4 5; offset: 0 4 0">
+        </a-entity>
+
+        <!-- Enclos (Fence) - Carré simple -->
+        <a-entity position="10 0 -15">
+            <a-entity gltf-model="#fenceModel" position="0 0 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+            <a-entity gltf-model="#fenceModel" position="4 0 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+            <a-entity gltf-model="#fenceModel" position="8 0 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+            
+            <a-entity gltf-model="#fenceModel" position="0 0 8" rotation="0 180 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+            <a-entity gltf-model="#fenceModel" position="4 0 8" rotation="0 180 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+            <a-entity gltf-model="#fenceModel" position="8 0 8" rotation="0 180 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+
+            <a-entity gltf-model="#fenceModel" position="-2 0 4" rotation="0 90 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+            <a-entity gltf-model="#fenceModel" position="10 0 4" rotation="0 90 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+
+            <!-- Gnous dans l'enclos -->
+            <a-entity gltf-model="#wildebeestModel" position="2 0 4" animation-mixer="clip: Walk; loop: repeat; timeScale: 1"></a-entity>
+            <a-entity gltf-model="#wildebeestModel" position="6 0 5" rotation="0 45 0" animation-mixer="clip: Idle; loop: repeat"></a-entity>
+        </a-entity>
+
+        <!-- Végétation & Loot (Génération procédurale simplifiée via script ci-dessous, mis en dur pour l'exemple) -->
+        <!-- Arbustes avec batons -->
+        <a-entity position="0 0 0" id="vegetation">
+            <!-- Nous allons générer ça en JS pour faire propre et éviter 50 lignes -->
+        </a-entity>
+
+        <!-- 5. LA CAISSE SPÉCIALE INTERACTIVE -->
+        <a-entity position="0 0 -3">
+            <!-- Caisse en bois -->
+            <a-entity gltf-model="#crateModel" 
+                id="mainCrate"
+                scale="1.5 1.5 1.5"
+                ammo-body="type: static" 
+                ammo-shape="type: box"
+                movement="type: static; stickiness: sticky" 
+                position="0 0.75 0">
+            </a-entity>
+
+            <!-- Objets posés SUR la caisse -->
+            <!-- Chapeau -->
+            <a-entity mixin="hatMixin" position="0 1.6 0"></a-entity>
+            <!-- Baton -->
+            <a-entity mixin="stickMixin" position="0.5 1.6 0.2" rotation="0 90 0"></a-entity>
+        </a-entity>
+
+        <!-- 6. JOUEUR (RIG CAMERA) -->
+        <a-entity id="rig">
+            <a-camera id="camera" position="0 1.6 0" look-controls wasd-controls></a-camera>
+            
+            <!-- Main Gauche : Teleport -->
+            <a-entity id="lhand" 
+                hand-controls="hand: left"
+                teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: [ammo-shape]"
+                visible="true">
+            </a-entity>
+
+            <!-- Main Droite : Interaction physique -->
+            <a-entity id="rhand" 
+                hand-controls="hand: right"
+                visible="true">
+            </a-entity>
+        </a-entity>
+    
+    </a-scene>
+
+    <!-- Script de génération procédurale (Pluie, Arbres) -->
+    <script>
+        // Génération Pluie
+        function createRain() {
+            var scene = document.querySelector('a-scene');
+            var rainCount = 1500; // Nombre de gouttes
+            
+            for(var i=0; i<rainCount; i++) {
+                var drop = document.createElement('a-entity');
+                drop.setAttribute('geometry', 'primitive: box; height: 0.1; width: 0.01; depth: 0.01');
+                drop.setAttribute('material', 'color: #AACCFF; opacity: 0.6; transparent: true');
+                drop.setAttribute('rain-drop', '');
+                scene.appendChild(drop);
+            }
+        }
+        
+        // Génération Arbres & Batons
+        function createVegetation() {
+            var container = document.querySelector('#vegetation');
+            var treeCount = 30; // Un peu plus d'arbres
+
+            // 1. Arbres & Batons
+            for(var i=0; i<treeCount; i++) {
+                var angle = Math.random() * Math.PI * 2;
+                var radius = 15 + Math.random() * 25; 
+                var x = Math.cos(angle) * radius;
+                var z = Math.sin(angle) * radius;
+
+                var shrub = document.createElement('a-entity');
+                shrub.setAttribute('mixin', 'shrubMixin');
+                shrub.setAttribute('position', {x: x, y: 0, z: z});
+                var s = 0.8 + Math.random() * 0.5;
+                shrub.setAttribute('scale', {x: s, y: s, z: s});
+                container.appendChild(shrub);
+
+                if(Math.random() > 0.5) {
+                    var stick = document.createElement('a-entity');
+                    stick.setAttribute('mixin', 'stickMixin');
+                    stick.setAttribute('position', {x: x + 0.5, y: 0.5, z: z + 0.5});
+                    stick.setAttribute('rotation', {x: Math.random()*360, y: Math.random()*360, z: Math.random()*360});
+                    container.appendChild(stick);
+                }
+            }
+
+            // 2. Touffes d'herbe (Grass.glb)
+            var grassCount = 200;
+            for(var j=0; j<grassCount; j++) {
+                var angleG = Math.random() * Math.PI * 2;
+                var radiusG = 2 + Math.random() * 40; 
+                var xG = Math.cos(angleG) * radiusG;
+                var zG = Math.sin(angleG) * radiusG;
+
+                var grass = document.createElement('a-entity');
+                grass.setAttribute('mixin', 'grassMixin');
+                grass.setAttribute('position', {x: xG, y: 0, z: zG});
+                grass.setAttribute('rotation', {x: 0, y: Math.random()*360, z: 0});
+                container.appendChild(grass);
+            }
+        }
+
+        // Lancement au chargement
+        window.addEventListener('load', function () {
+            createRain();
+            createVegetation();
+        });
+    </script>
+</body>
+</html>
