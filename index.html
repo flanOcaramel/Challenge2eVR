@@ -4,26 +4,21 @@
     <meta charset="utf-8">
     <title>La Prairie Pluvieuse - VR</title>
     <meta name="description" content="Environnement VR immersif avec physique">
-    
+
     <!-- 1. IMPORT A-FRAME & LIBRARIES -->
     <!-- A-Frame Core -->
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    
+
     <!-- A-Frame Extras (Animation, Controls, etc.) -->
     <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.0.0/dist/aframe-extras.min.js"></script>
 
-    <!-- Physics System (Ammo Driver) -->
-    <!-- Note: Ammo.js wasm loader config usually handled by aframe-physics-system, but explicit load can be safer -->
     <script src="https://cdn.jsdelivr.net/gh/MozillaReality/ammo.js@8bbc0ea/builds/ammo.wasm.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-physics-system@v4.2.2/dist/aframe-physics-system.min.js"></script>
-    
-    <!-- Teleport Controls -->
-    <script src="https://rawgit.com/fernsroth/aframe-teleport-controls/master/dist/aframe-teleport-controls.min.js"></script>
+
+    <!-- Teleport Controls removed due to loading issues -->
 
     <!-- Custom User Scripts -->
-    <!-- Custom User Scripts -->
     <script src="./assets/js/christmas-utils.js"></script>
-    <!-- Script introuvable : <script src="./research/physics-ammo/move-objects-ph3.js"></script> -->
 
     <script>
         // Configuration simple pour la pluie (sera lancée plus bas)
@@ -48,117 +43,155 @@
     </script>
 </head>
 <body>
-    <!-- Config Scene avec Physique Ammo (Sans fog pour ciel net) -->
-    <a-scene 
-        physics="driver: ammo; debug: false; gravity: -9.8"
-        renderer="antialias: false; colorManagement: true; sortObjects: true">
+    <!-- Login Overlay -->
+    <div id="loginOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 20px; border-radius: 10px; text-align: center;">
+            <h2>Connexion à Challenge2eVR</h2>
+            <form id="loginForm">
+                <select id="username" required style="display: block; margin: 10px 0; padding: 10px; width: 220px;">
+                    <option value="">Select Username</option>
+                </select><br>
+                <input type="password" id="password" placeholder="Password" required style="display: block; margin: 10px 0; padding: 10px; width: 200px;"><br>
+                <button type="submit" style="padding: 10px 20px;">Login</button>
+            </form>
+            <div id="loginMessage" style="margin-top: 10px; color: red;"></div>
+        </div>
+    </div>
 
-        <!-- 2. ASSETS -->
-        <a-assets>
-            <!-- Texture Sol Réaliste (CDN Three.js) -->
-            <img id="grassTexture" src="https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/terrain/grasslight-big.jpg">
-            
-            <!-- Modèles 3D -->
-            <a-asset-item id="grassModel" src="./assets/models/Grass.glb"></a-asset-item>
-            <a-asset-item id="barnModel" src="./assets/models/wooden_barn.glb"></a-asset-item>
-            <a-asset-item id="fenceModel" src="./assets/models/fence.glb"></a-asset-item>
-            <a-asset-item id="wildebeestModel" src="./assets/models/wildebeest.glb"></a-asset-item>
-            <a-asset-item id="treeModel" src="./assets/models/Tree.glb"></a-asset-item>
-            <a-asset-item id="bushModel" src="./assets/models/bush.glb"></a-asset-item>
-            <a-asset-item id="stickModel" src="./assets/models/Stick.glb"></a-asset-item>
-            <a-asset-item id="crateModel" src="./assets/models/Crate.glb"></a-asset-item>
-            <a-asset-item id="hatModel" src="./assets/models/hat.glb"></a-asset-item>
-            <a-asset-item id="sunModel" src="./assets/models/Sun.glb"></a-asset-item>
-            <a-asset-item id="chatModel" src="./assets/models/chat.glb"></a-asset-item>
-            <a-asset-item id="swingModel" src="./assets/models/balancoire.glb"></a-asset-item>
+    <!-- VR Scene will be added here after login -->
 
-            <!-- Mixins Physiques & Interactions -->
-            <!-- Objet attrapable standard -->
-            <a-mixin id="grabbable" 
-                movement="type: grabbable; stickiness: stickable"
-                ammo-shape="type: hull"
-                ammo-body="type: dynamic; mass: 1">
-            </a-mixin>
+    <!-- Login Script -->
+    <script>
+        // Load usernames from DB
+        fetch('https://selles-francesconi.sio-chopin.fr/Challenge2e/public/index.php?page=api_usernames')
+            .then(response => response.json())
+            .then(usernames => {
+                const select = document.getElementById('username');
+                usernames.forEach(username => {
+                    const option = document.createElement('option');
+                    option.value = username;
+                    option.textContent = username;
+                    select.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error loading usernames:', error));
 
-            <a-mixin id="grassMixin" gltf-model="#grassModel" scale="0.1 0.1 0.1"></a-mixin>
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const message = document.getElementById('loginMessage');
 
-            <a-mixin id="stickMixin" 
-                gltf-model="#stickModel" 
-                scale="1 1 1"
-                mixin="grabbable">
-            </a-mixin>
+            fetch('https://selles-francesconi.sio-chopin.fr/Challenge2e/public/index.php?page=api_login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Load avatar
+                    const avatar = data.avatar;
+                    const modelId = avatar.model.replace('.glb', 'Model');
 
-            <a-mixin id="hatMixin"
-                gltf-model="#hatModel"
-                scale="1 1 1"
-                mixin="grabbable">
-            </a-mixin>
+                    // Check world
+                    const world = data.world;
+                    if (world.name.toLowerCase().includes('prairie')) {
+                        // Load prairie world
+                        document.getElementById('loginOverlay').style.display = 'none';
+                        loadVRScene(modelId);
+                    } else {
+                        // Redirect to another world
+                        window.location.href = world.url;
+                    }
+                } else {
+                    message.textContent = data.message;
+                }
+            })
+            .catch(error => {
+                message.textContent = 'Error connecting to server.';
+                console.error(error);
+            });
+        });
+    </script>
 
-            <!-- Mixins Christmas (Image User) -->
-            <a-mixin id="coal" material="color:black" 
-                     geometry="primitive:sphere; segments-height:7; segments-width:13; radius:0.04"
-                     movement="type:grabbable; stickiness:stickable"
-                     ammo-shape="type:sphere; fit:manual; sphereRadius:0.04"
-                     ammo-body="type:dynamic; mass:0.1">
-            </a-mixin>
-            <a-mixin id="branch" material="color:#5C4033" 
-                     geometry="primitive:branch" scale="0.2 0.2 0.2"
-                     movement="type:grabbable; stickiness:stickable"
-                     ammo-shape="type:hull"
-                     ammo-body="type:dynamic; mass:0.1">
-            </a-mixin>
+    <script>
+        function loadVRScene(avatarModelId) {
+            // Create the a-scene element dynamically
+            const scene = document.createElement('a-scene');
+            scene.id = 'vrScene';
+            scene.setAttribute('physics', 'driver: ammo; debug: false; gravity: -9.8');
+            scene.setAttribute('renderer', 'antialias: true; colorManagement: true;');
+            scene.innerHTML = `
+                <!-- 2. ASSETS -->
+                <a-assets>
+                    <!-- Texture Sol Réaliste (CDN Three.js) -->
+                    <img id="grassTexture" src="https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/terrain/grasslight-big.jpg">
 
-            <!-- Mixin Arbre (Décor) -->
-            <a-mixin id="treeMixin"
-                gltf-model="#treeModel"
-                scale="3 3 3"
-                ammo-body="type: static" 
-                ammo-shape="type: cylinder">
-            </a-mixin>
+                    <!-- Modèles 3D -->
+                    <a-asset-item id="grassModel" src="./assets/models/Grass.glb"></a-asset-item>
+                    <a-asset-item id="barnModel" src="./assets/models/wooden_barn.glb"></a-asset-item>
+                    <a-asset-item id="fenceModel" src="./assets/models/fence.glb"></a-asset-item>
+                    <a-asset-item id="wildebeestModel" src="./assets/models/wildebeest.glb"></a-asset-item>
+                    <a-asset-item id="treeModel" src="./assets/models/Tree.glb"></a-asset-item>
+                    <a-asset-item id="bushModel" src="./assets/models/bush.glb"></a-asset-item>
+                    <a-asset-item id="stickModel" src="./assets/models/Stick.glb"></a-asset-item>
+                    <a-asset-item id="crateModel" src="./assets/models/Crate.glb"></a-asset-item>
+                    <a-asset-item id="hatModel" src="./assets/models/hat.glb"></a-asset-item>
+                    <a-asset-item id="sunModel" src="./assets/models/Sun.glb"></a-asset-item>
+                    <a-asset-item id="chatModel" src="./assets/models/chat.glb"></a-asset-item>
+                    <a-asset-item id="swingModel" src="./assets/models/balancoire.glb"></a-asset-item>
 
-            <!-- Mixin Bush (Petit buisson) -->
-            <a-mixin id="bushMixin"
-                gltf-model="#bushModel"
-                scale="0.02 0.02 0.02" 
-                ammo-body="type: static" 
-                ammo-shape="type: box">
-            </a-mixin>
-        </a-assets>
+                    <!-- Avatar Models -->
+                    <a-asset-item id="aventurierModel" src="./assets/models/aventurier.glb"></a-asset-item>
+                    <a-asset-item id="astronauteModel" src="./assets/models/astronaute.glb"></a-asset-item>
+                    <a-asset-item id="fitnessModel" src="./assets/models/fitness.glb"></a-asset-item>
+                    <a-asset-item id="sharkModel" src="./assets/models/shark.glb"></a-asset-item>
+                    <a-asset-item id="pugModel" src="./assets/models/pug.glb"></a-asset-item>
 
-        <!-- 3. ENVIRONNEMENT -->
-        <!-- Ciel Ensoleillé (Bleu pur) -->
-        <a-sky color="#87CEEB"></a-sky>
+                    <!-- Mixins Physiques & Interactions -->
+                    <!-- Objet attrapable standard -->
+                    <a-mixin id="grabbable"
+                        movement="type: grabbable; stickiness: stickable"
+                        ammo-shape="type: hull"
+                        ammo-body="type: dynamic; mass: 1">
+                    </a-mixin>
 
-        <!-- Soleil -->
-        <a-entity gltf-model="#sunModel" position="-20 50 -30" scale="5 5 5"></a-entity>
-        
-        <!-- Lumière -->
-        <a-entity light="type: ambient; color: #FFF; intensity: 0.7"></a-entity>
-        <a-entity light="type: directional; color: #FFF; intensity: 1; castShadow: false" position="-1 1 0.5"></a-entity>
+                    <a-mixin id="grassMixin" gltf-model="#grassModel" scale="0.1 0.1 0.1"></a-mixin>
 
-        <a-plane 
-            src="#grassTexture"
-            rotation="-90 0 0" 
-            width="100" 
-            height="100" 
-            repeat="20 20"
-            material="roughness: 1; metalness: 0"
-            ammo-body="type: static" 
-            ammo-shape="type: box">
-        </a-plane>
+                    <a-mixin id="stickMixin"
+                        gltf-model="#stickModel"
+                        scale="1 1 1"
+                        mixin="grabbable">
+                    </a-mixin>
 
-        <!-- 4. ÉLÉMENTS SCÉNIQUES -->
-        <!-- Hangar -->
-        <a-entity gltf-model="#barnModel" position="-10 0 -15" scale="2 2 2" 
-            ammo-body="type: static" 
-            ammo-shape="type: box; fit: manual; halfExtents: 5 4 5; offset: 0 4 0">
-        </a-entity>
+                    <a-mixin id="hatMixin"
+                        gltf-model="#hatModel"
+                        scale="1 1 1"
+                        mixin="grabbable">
+                    </a-mixin>
 
-        <!-- Balançoire (Devant la maison) -->
-        <!-- Réduite de 15% addtionnelle (0.02 * 0.85 = 0.017) -->
-        <a-entity gltf-model="#swingModel" position="-10 0 -5" rotation="0 180 0" scale="0.017 0.017 0.017"
-             ammo-body="type: static" ammo-shape="type: hull"></a-entity>
+                    <!-- Mixins Christmas (Image User) -->
+                    <a-mixin id="coal" material="color:black"
+                             geometry="primitive:sphere; segments-height:7; segments-width:13; radius:0.04"
+                             movement="type:grabbable; stickiness:stickable"
+                             ammo-shape="type:sphere; fit:manual; sphereRadius:0.04"
+                             ammo-body="type:dynamic; mass:0.1">
+                    </a-mixin>
+                    <a-mixin id="branch" material="color:#5C4033"
+                             geometry="primitive:branch" scale="0.2 0.2 0.2"
+                             movement="type:grabbable; stickiness:stickable"
+                             ammo-shape="type:hull"
+                             ammo-body="type:dynamic; mass:0.1">
+                    </a-mixin>
 
+                    <!-- Mixin Arbre (Décor) -->
+                    <a-mixin id="treeMixin"
+                        gltf-model="#treeModel"
+                        scale="3 3 3"
+                        ammo-body="type: static"
+                        ammo-shape="type: cylinder">
+                    </a-mixin>
         <!-- Enclos (Fence) -->
         <a-entity position="10 0 -15" id="enclosArea">
             <!-- Façade -->
@@ -184,44 +217,115 @@
             <a-entity id="gnou6" gltf-model="#wildebeestModel" position="4 0 2" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 0.95"></a-entity>
         </a-entity>
 
-        <!-- Végétation & Loot -->
-        <a-entity position="0 0 0" id="vegetation"></a-entity>
+                    <!-- Mixin Bush (Petit buisson) -->
+                    <a-mixin id="bushMixin"
+                        gltf-model="#bushModel"
+                        scale="0.02 0.02 0.02"
+                        ammo-body="type: static"
+                        ammo-shape="type: box">
+                    </a-mixin>
+                </a-assets>
 
-        <!-- LE CHAT -->
-        <!-- Scale 0.05. Rehaussé Y=0.15 pour ne pas être enterré -->
-        <a-entity gltf-model="#chatModel" position="-12 0.50 -11" scale="0.02 0.02 0.02" rotation="0 45 0" 
-                  ammo-body="type: static" ammo-shape="type: hull"></a-entity>
+                <!-- 3. ENVIRONNEMENT -->
+                <!-- Ciel Ensoleillé (Bleu pur) -->
+                <a-sky color="#87CEEB"></a-sky>
 
-        <!-- 5. LA CAISSE SPÉCIALE INTERACTIVE -->
-        <a-entity position="-6 0 -11"> 
-            <!-- Caisse en bois -->
-            <a-entity gltf-model="#crateModel" 
-                id="mainCrate"
-                scale="1 1 1"
-                ammo-body="type: static" 
-                ammo-shape="type: box"
-                movement="type: static; stickiness: sticky" 
-                position="0 0 0">
-            </a-entity>
+                <!-- Soleil -->
+                <a-entity gltf-model="#sunModel" position="-20 50 -30" scale="5 5 5"></a-entity>
 
-            <!-- Objets posés SUR la caisse -->
-            <!-- Chapeau : Taille réduite (0.2) et posé dessus -->
-            <a-entity mixin="hatMixin" position="0 1.0 0" scale="0.2 0.2 0.2"></a-entity>
-            <!-- Baton -->
-            <a-entity mixin="stickMixin" position="0.5 1.0 0.2" rotation="0 90 0"></a-entity>
-            <!-- 3. Coal & Branch (Nouveaux) -->
-            <a-entity mixin="coal" position="-0.3 1.05 0.2"></a-entity>
-            <a-entity mixin="branch" position="0.3 1.02 -0.2" rotation="90 0 0"></a-entity>
-        </a-entity>
+                <!-- Lumière -->
+                <a-entity light="type: ambient; color: #FFF; intensity: 0.7"></a-entity>
+                <a-entity light="type: directional; color: #FFF; intensity: 1; castShadow: false" position="-1 1 0.5"></a-entity>
 
-        <!-- 6. JOUEUR (RIG CAMERA) -->
-        <a-entity id="rig">
-            <a-camera id="camera" position="0 1.6 0" look-controls wasd-controls></a-camera>
-            <a-entity id="lhand" hand-controls="hand: left" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: [ammo-shape]" visible="true"></a-entity>
-            <a-entity id="rhand" hand-controls="hand: right" visible="true"></a-entity>
-        </a-entity>
-    
-    </a-scene>
+                <a-plane
+                    src="#grassTexture"
+                    rotation="-90 0 0"
+                    width="100"
+                    height="100"
+                    repeat="20 20"
+                    material="roughness: 1; metalness: 0"
+                    ammo-body="type: static"
+                    ammo-shape="type: box">
+                </a-plane>
+
+                <!-- 4. ÉLÉMENTS SCÉNIQUES -->
+                <!-- Hangar -->
+                <a-entity gltf-model="#barnModel" position="-10 0 -15" scale="2 2 2"
+                    ammo-body="type: static"
+                    ammo-shape="type: box; fit: manual; halfExtents: 5 4 5; offset: 0 4 0">
+                </a-entity>
+
+                <!-- Balançoire (Devant la maison) -->
+                <a-entity gltf-model="#swingModel" position="-10 0 -5" rotation="0 180 0" scale="0.017 0.017 0.017"
+                     ammo-body="type: static" ammo-shape="type: hull"></a-entity>
+
+                <!-- Enclos (Fence) -->
+                <a-entity position="10 0 -15" id="enclosArea">
+                    <!-- Façade -->
+                    <a-entity gltf-model="#fenceModel" position="0 0 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+                    <a-entity gltf-model="#fenceModel" position="4 0 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+                    <a-entity gltf-model="#fenceModel" position="8 0 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+                    <!-- Arrière -->
+                    <a-entity gltf-model="#fenceModel" position="0 0 8" rotation="0 180 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+                    <a-entity gltf-model="#fenceModel" position="4 0 8" rotation="0 180 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+                    <a-entity gltf-model="#fenceModel" position="8 0 8" rotation="0 180 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+                    <!-- Côtés -->
+                    <a-entity gltf-model="#fenceModel" position="-2 0 2" rotation="0 90 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+                    <a-entity gltf-model="#fenceModel" position="-2 0 6" rotation="0 90 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+                    <a-entity gltf-model="#fenceModel" position="10 0 2" rotation="0 90 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+                    <a-entity gltf-model="#fenceModel" position="10 0 6" rotation="0 90 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+
+                    <!-- 5 Gnous (Wildebeests) -->
+                    <a-entity id="gnou1" gltf-model="#wildebeestModel" position="4 0 4" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 1.0"></a-entity>
+                    <a-entity id="gnou2" gltf-model="#wildebeestModel" position="5 0 5" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 0.9"></a-entity>
+                    <a-entity id="gnou3" gltf-model="#wildebeestModel" position="3 0 5" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 1.1"></a-entity>
+                    <a-entity id="gnou4" gltf-model="#wildebeestModel" position="5 0 3" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 1.05"></a-entity>
+                    <a-entity id="gnou5" gltf-model="#wildebeestModel" position="3 0 3" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 0.95"></a-entity>
+                </a-entity>
+
+                <!-- Végétation & Loot -->
+                <a-entity position="0 0 0" id="vegetation"></a-entity>
+
+                <!-- LE CHAT -->
+                <a-entity gltf-model="#chatModel" position="-12 0.50 -11" scale="0.02 0.02 0.02" rotation="0 45 0"
+                          ammo-body="type: static" ammo-shape="type: hull"></a-entity>
+
+                <!-- 5. LA CAISSE SPÉCIALE INTERACTIVE -->
+                <a-entity position="-6 0 -11">
+                    <!-- Caisse en bois -->
+                    <a-entity gltf-model="#crateModel"
+                        id="mainCrate"
+                        scale="1 1 1"
+                        ammo-body="type: static"
+                        ammo-shape="type: box"
+                        movement="type: static; stickiness: sticky"
+                        position="0 0 0">
+                    </a-entity>
+
+                    <!-- Objets posés SUR la caisse -->
+                    <a-entity mixin="hatMixin" position="0 1.0 0" scale="0.2 0.2 0.2"></a-entity>
+                    <a-entity mixin="stickMixin" position="0.5 1.0 0.2" rotation="0 90 0"></a-entity>
+                    <a-entity mixin="coal" position="-0.3 1.05 0.2"></a-entity>
+                    <a-entity mixin="branch" position="0.3 1.02 -0.2" rotation="90 0 0"></a-entity>
+                </a-entity>
+
+                <!-- 6. JOUEUR (RIG CAMERA) -->
+                <a-entity id="rig">
+                    <a-camera id="camera" position="0 1.6 0" look-controls wasd-controls></a-camera>
+                    <a-entity id="playerAvatar" gltf-model="#${avatarModelId}" position="0 -1.6 0" scale="0.5 0.5 0.5"></a-entity>
+                    <a-entity id="lhand" hand-controls="hand: left" visible="true"></a-entity>
+                    <a-entity id="rhand" hand-controls="hand: right" visible="true"></a-entity>
+                </a-entity>
+            `;
+            document.body.appendChild(scene);
+            // Initialize the scene after adding
+            setTimeout(() => {
+                createRain();
+                createVegetation();
+                animateGnous();
+            }, 100);
+        }
+    </script>
 
     <!-- Script de génération procédurale & Animation -->
     <script>
@@ -237,7 +341,7 @@
                 scene.appendChild(drop);
             }
         }
-        
+
         // Végétation (Arbres Decor & Bush Sol)
         function createVegetation() {
             var container = document.querySelector('#vegetation');
@@ -247,7 +351,7 @@
             // Centre approximatif de la zone de vie : x=0, z=-10
             var treeCount = 32;
             var trees = [];
-            
+
             for(var i=0; i<treeCount; i++) {
                 var valid = false, attempts = 0;
                 var x, z;
@@ -261,7 +365,7 @@
                     var dist = Math.sqrt((x - 0)**2 + (z - -10)**2);
 
                     // REGLE : On veut les arbres LOIN du centre (> 25m) et pas trop proches les uns des autres
-                    if(dist > 25) { 
+                    if(dist > 25) {
                         valid = true;
                         // Check anti-collision entre arbres
                         for(var t=0; t<trees.length; t++) {
@@ -276,7 +380,7 @@
                     var tree = document.createElement('a-entity');
                     tree.setAttribute('mixin', 'treeMixin');
                     // Scale augmenté ENCORE de 30% (Total: 1.69)
-                    var s = (1.0 + Math.random() * 1.5) * 3; 
+                    var s = (1.0 + Math.random() * 1.5) * 3;
                     // CORRECTION: position Y levée selon le scale (approx pivot centré)
                     tree.setAttribute('position', {x: x, y: s * 1, z: z});
                     tree.setAttribute('scale', {x: s, y: s, z: s});
@@ -297,14 +401,14 @@
             for(var k=0; k<bushCount; k++) {
                 var x = (Math.random() - 0.5) * 70;
                 var z = (Math.random() - 0.5) * 70;
-                
+
                 if(!isForbidden(x,z)) {
                    var bush = document.createElement('a-entity');
                    bush.setAttribute('mixin', 'bushMixin');
                    bush.setAttribute('position', {x: x, y: 0, z: z});
-                   // Scale augmenté car 0.02 était invisible. 
+                   // Scale augmenté car 0.02 était invisible.
                    // On tente 0.5 à 0.8
-                   var s = 0.5 + Math.random() * 0.5; 
+                   var s = 0.5 + Math.random() * 0.5;
                    bush.setAttribute('scale', {x: s, y: s, z: s});
                    bush.setAttribute('rotation', {x: 0, y: Math.random()*360, z: 0});
                    container.appendChild(bush);
@@ -315,7 +419,7 @@
             var grassCount = 150; // OPTIMISATION
             for(var j=0; j<grassCount; j++) {
                 var angleG = Math.random() * Math.PI * 2;
-                var radiusG = 2 + Math.random() * 45; 
+                var radiusG = 2 + Math.random() * 45;
                 var xG = Math.cos(angleG) * radiusG;
                 var zG = Math.sin(angleG) * radiusG;
                 var grass = document.createElement('a-entity');
@@ -437,6 +541,28 @@
                             p1.x += pushX; p1.z += pushZ;
                             p2.x -= pushX; p2.z -= pushZ;
                         }
+            setInterval(function() {
+                t += 0.02;
+                gnous.forEach(function(g, index) {
+                    if(g && g.object3D) {
+                        // Varie Rayon et Phase
+                        var offset = index * (Math.PI * 2 / 5);
+                        var r = 2.5 + (index % 2) * 1;
+
+                        var x = 4 + Math.cos(t * 0.5 + offset) * r;
+                        var z = 4 + Math.sin(t * 0.5 + offset) * r;
+
+                        g.object3D.position.set(x, 0, z);
+                        // Orientation: Regarder vers l'avant de la marche
+                        // Tangente au cercle
+                        var angle = t * 0.5 + offset;
+                        // En A-Frame Rotation Y: 0 = -Z, 90 = -X...
+                        // Angle maths: 0 = +X.
+                        // Pour regarder "devant" sur le cercle trigonométrique (sens anti-horaire):
+                        // Rotation = -Angle + PI (ou similaire).
+                        // On ajuste expérimentalement si "à l'envers".
+                        // Essayons Rotation Y = -Angle
+                        g.object3D.rotation.y = -angle;
                     }
                 }
             }
@@ -445,9 +571,7 @@
 
         // Lancement au chargement
         window.addEventListener('load', function () {
-            createRain();
-            createVegetation();
-            animateGnous(); 
+            // Do nothing here, wait for login
         });
     </script>
 </body>
