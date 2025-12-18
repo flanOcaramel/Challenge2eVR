@@ -153,6 +153,8 @@
             ammo-body="type: static" 
             ammo-shape="type: box; fit: manual; halfExtents: 5 4 5; offset: 0 4 0">
         </a-entity>
+        <!-- Example grabbable object (desktop + VR) - moved away from keyboard -->
+        <a-box grabbable class="grabbable" position="0 1.2 -2.5" depth="0.25" height="0.25" width="0.25" color="#4CC3D9" material="metalness:0.2; roughness:0.6"></a-box>
 
         <!-- Balançoire (Devant la maison) -->
         <!-- Réduite de 15% addtionnelle (0.02 * 0.85 = 0.017) -->
@@ -223,8 +225,8 @@
             <a-camera id="camera" position="0 1.6 0" look-controls wasd-controls>
                 <a-entity cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
             </a-camera>
-            <a-entity id="lhand" hand-controls="hand: left" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: [ammo-shape]" visible="true"></a-entity>
-            <a-entity id="rhand" hand-controls="hand: right" visible="true"></a-entity>
+            <a-entity id="lhand" hand-controls="hand: left" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: [ammo-shape]" visible="true" grabber raycaster="objects: .grabbable, .clickable; showLine: false"></a-entity>
+            <a-entity id="rhand" hand-controls="hand: right" visible="true" grabber raycaster="objects: .grabbable, .clickable; showLine: false"></a-entity>
             <!-- Laser controls for pointer interaction with keys -->
             <a-entity laser-controls="hand: right" raycaster="objects: .clickable"></a-entity>
             <a-entity laser-controls="hand: left" raycaster="objects: .clickable"></a-entity>
@@ -487,10 +489,10 @@
         function animateGnous() {
             var gnous = [
                 document.querySelector('#gnou1'),
-                //document.querySelector('#gnou2'),
-                //document.querySelector('#gnou3'),
-                //document.querySelector('#gnou4'),
-                //document.querySelector('#gnou5')
+                document.querySelector('#gnou2'),
+                document.querySelector('#gnou3'),
+                document.querySelector('#gnou4'),
+                document.querySelector('#gnou5')
             ];
 
             var t = 0;
@@ -520,6 +522,170 @@
                 });
             }, 50);
         }
+
+        // --- Grab system: components `grabbable` and `grabber` ---
+        // Grabbable: attach this component (and optionally class="grabbable") to any entity
+        // Grabber: attach to a hand entity or camera to enable grabbing with trigger/grip or mouse
+        (function(){
+            AFRAME.registerComponent('grabbable', {
+                schema: {},
+                init: function() {
+                    // Track which entity currently grabs this one (null if free)
+                    this.grabbedBy = null;
+                },
+                isGrabbed: function() {
+                    return !!this.grabbedBy;
+                },
+                grab: function(byEl) {
+                    if (this.grabbedBy) return false; // already grabbed
+                    this.grabbedBy = byEl;
+                    this.el.classList.add('is-grabbed');
+                    this.el.emit('grab-start', { by: byEl });
+                    return true;
+                },
+                release: function() {
+                    var prev = this.grabbedBy;
+                    this.grabbedBy = null;
+                    this.el.classList.remove('is-grabbed');
+                    this.el.emit('grab-end', { by: prev });
+                }
+            });
+
+            AFRAME.registerComponent('grabber', {
+                schema: {},
+                init: function() {
+                    // internal state
+                    this.grabbedEl = null;
+                    this.offsetMatrix = new THREE.Matrix4();
+                    this.invHandMatrix = new THREE.Matrix4();
+                    this.tempMatrix = new THREE.Matrix4();
+
+                    // bind handlers
+                    this.onDown = this.onDown.bind(this);
+                    this.onUp = this.onUp.bind(this);
+
+                    // VR controller events
+                    this.el.addEventListener('triggerdown', this.onDown);
+                    this.el.addEventListener('gripdown', this.onDown);
+                    this.el.addEventListener('triggerup', this.onUp);
+                    this.el.addEventListener('gripup', this.onUp);
+
+                    // Desktop fallback (mouse)
+                    this.el.addEventListener('mousedown', this.onDown);
+                    window.addEventListener('mouseup', this.onUp);
+                },
+
+                remove: function() {
+                    this.el.removeEventListener('triggerdown', this.onDown);
+                    this.el.removeEventListener('gripdown', this.onDown);
+                    this.el.removeEventListener('triggerup', this.onUp);
+                    this.el.removeEventListener('gripup', this.onUp);
+                    this.el.removeEventListener('mousedown', this.onDown);
+                    window.removeEventListener('mouseup', this.onUp);
+                },
+
+                // When grab button pressed
+                onDown: function(evt) {
+                    if (this.grabbedEl) return; // already holding something
+
+                    // Query raycaster intersections (works for laser-controls or cursor)
+                    var rc = this.el.components && this.el.components.raycaster;
+                    var intersections = rc && rc.intersections ? rc.intersections : [];
+
+                    if (!intersections.length) return;
+
+                    // find first intersected entity that is grabbable and not grabbed
+                    var found = null;
+                    for (var i = 0; i < intersections.length; i++) {
+                        var obj = intersections[i].object;
+                        var candidate = obj && obj.el ? obj.el : null;
+                        if (!candidate) continue;
+                        // candidate may be a mesh child of the entity; climb up to entity if needed
+                        // check for component or class
+                        if (candidate.components && candidate.components.grabbable) {
+                            if (!candidate.components.grabbable.isGrabbed()) { found = candidate; break; }
+                        } else if (candidate.classList && candidate.classList.contains('grabbable')) {
+                            // if only class used, attach grabbable component dynamically
+                            if (!candidate.components || !candidate.components.grabbable) {
+                                candidate.setAttribute('grabbable', '');
+                            }
+                            if (!candidate.components.grabbable.isGrabbed()) { found = candidate; break; }
+                        }
+                    }
+
+                    if (found) {
+                        this._grab(found);
+                    }
+                },
+
+                // Grab implementation: compute offset and start following
+                _grab: function(targetEl) {
+                    if (!targetEl) return;
+                    // mark grabbed on target's component
+                    if (targetEl.components && targetEl.components.grabbable) {
+                        var ok = targetEl.components.grabbable.grab(this.el);
+                        if (!ok) return; // someone else grabbed it
+                    } else {
+                        targetEl.setAttribute('grabbable', '');
+                        targetEl.components.grabbable.grab(this.el);
+                    }
+
+                    // compute offset matrix: inv(handWorld) * objectWorld
+                    this.invHandMatrix.copy(this.el.object3D.matrixWorld).invert();
+                    this.offsetMatrix.copy(this.invHandMatrix).multiply(targetEl.object3D.matrixWorld);
+
+                    // keep reference
+                    this.grabbedEl = targetEl;
+
+                    // optionally make smaller collision or visual change
+                    this.grabbedEl.emit('grabbed', { by: this.el });
+                },
+
+                // When release button
+                onUp: function(evt) {
+                    if (!this.grabbedEl) return;
+
+                    var released = this.grabbedEl;
+
+                    // compute final world matrix (already updated in tick)
+                    var worldMat = new THREE.Matrix4().copy(released.object3D.matrixWorld);
+
+                    // release component
+                    if (released.components && released.components.grabbable) released.components.grabbable.release();
+
+                    // reparent to scene (so it stays where released)
+                    var sceneEl = this.el.sceneEl;
+                    sceneEl.appendChild(released);
+
+                    // apply world transform as local after reparent
+                    released.object3D.matrix.copy(worldMat);
+                    var pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scale = new THREE.Vector3();
+                    released.object3D.matrix.decompose(pos, quat, scale);
+                    released.object3D.position.copy(pos);
+                    released.object3D.quaternion.copy(quat);
+                    released.object3D.scale.copy(scale);
+                    released.object3D.updateMatrixWorld(true);
+
+                    released.emit('released', { by: this.el });
+                    this.grabbedEl = null;
+                },
+
+                tick: function() {
+                    if (!this.grabbedEl) return;
+
+                    // compute new world matrix = handWorld * offsetMatrix
+                    this.tempMatrix.copy(this.el.object3D.matrixWorld).multiply(this.offsetMatrix);
+                    var pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scale = new THREE.Vector3();
+                    this.tempMatrix.decompose(pos, quat, scale);
+
+                    // apply to grabbed entity
+                    this.grabbedEl.object3D.position.copy(pos);
+                    this.grabbedEl.object3D.quaternion.copy(quat);
+                    this.grabbedEl.object3D.scale.copy(scale);
+                    this.grabbedEl.object3D.updateMatrixWorld(true);
+                }
+            });
+        })();
 
         // Lancement au chargement
         window.addEventListener('load', function () {
