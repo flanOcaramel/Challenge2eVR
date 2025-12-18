@@ -268,7 +268,7 @@
                 }
             });
 
-            // COMPONENT: 'Enter' Key Teleport (Simulates VR Left Hand)
+            // COMPONENT: 'Enter' Key Teleport (Smart PC + VR Sim)
             AFRAME.registerComponent('enter-teleport-trigger', {
                 init: function() {
                     this.onKeyDown = this.onKeyDown.bind(this);
@@ -282,7 +282,24 @@
                 },
                 onKeyDown: function(e) {
                     if (e.code === 'Enter') {
-                        console.log("Enter key pressed for Teleport");
+                        // 1. PC Priority: Try Cursor/Mouse Raycast
+                        const cursor = document.querySelector('[cursor]');
+                        const rig = document.querySelector('#rig');
+                        if (cursor && cursor.components.raycaster && rig) {
+                             const hits = cursor.components.raycaster.intersections;
+                             if (hits.length > 0) {
+                                 const pt = hits[0].point;
+                                 // Instant Teleport to looked-at point
+                                 rig.object3D.position.x = pt.x;
+                                 rig.object3D.position.z = pt.z;
+                                 // Keep current Y or snap to floor (usually navigation stays on 0 or navmesh)
+                                 console.log("Teleported Rig to:", pt);
+                                 return;
+                             }
+                        }
+
+                        // 2. Fallback: Trigger VR Hand Teleport (Ray Arc)
+                        // Useful if looking at sky or using VR logic
                         var lHand = document.querySelector('#lhand');
                         if (lHand) lHand.emit('teleportstart');
                     }
