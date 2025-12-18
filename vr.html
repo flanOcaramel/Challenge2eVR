@@ -777,10 +777,11 @@
         <a-entity id="rig" movement-controls="speed: 0.15; constrainToNavMesh: false">
             <a-camera id="camera" position="0 1.6 0" look-controls>
                 <!-- Allow desktop cursor to hit UI AND Grabbable objects on PC -->
-                <a-entity cursor="rayOrigin: mouse" raycaster="objects: .clickable, .grabbable" grabber></a-entity>
+                <!-- Allow desktop cursor to hit UI AND Grabbable objects on PC -->
+                <a-entity cursor="rayOrigin: mouse" raycaster="objects: .clickable, .grabbable, [mixin*='grabbable']" grabber></a-entity>
             </a-camera>
-            <a-entity id="lhand" hand-controls="hand: left" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: [ammo-shape]; startEvents: teleportstart; endEvents: teleportend" visible="true" grabber raycaster="objects: .grabbable, .clickable; showLine: false"></a-entity>
-            <a-entity id="rhand" hand-controls="hand: right" visible="true" grabber raycaster="objects: .grabbable, .clickable; showLine: false"></a-entity>
+            <a-entity id="lhand" hand-controls="hand: left" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: [ammo-shape]; startEvents: teleportstart; endEvents: teleportend" visible="true" grabber raycaster="objects: .grabbable, .clickable, [mixin*='grabbable']; showLine: false"></a-entity>
+            <a-entity id="rhand" hand-controls="hand: right" visible="true" grabber raycaster="objects: .grabbable, .clickable, [mixin*='grabbable']; showLine: false"></a-entity>
             <!-- Laser controls for pointer interaction with keys -->
             <a-entity laser-controls="hand: right" raycaster="objects: .clickable"></a-entity>
             <a-entity laser-controls="hand: left" raycaster="objects: .clickable"></a-entity>
