@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Test Assets - Chat, Enclos, Wildebeest, Loot</title>
+    
+    <!-- A-Frame & Extras (Required for Animations) -->
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.0.0/dist/aframe-extras.min.js"></script>
+
+    <!-- AI Scripts (Extracted) -->
+    <script>
+      // AI WILDEBEEST
+      AFRAME.registerComponent("wildebeest-ai", {
+        init: function () {
+            this.direction = new THREE.Vector3(0, 0, 1);
+            this.speed = 0.02;
+            this.turnTimer = 0;
+        },
+        tick: function () {
+            // Move forward (Negative Z is forward in WebGL/A-Frame)
+            this.el.object3D.translateZ(-this.speed);
+
+            this.turnTimer++;
+            
+            // Random turn every now and then
+            if (this.turnTimer > 200 + Math.random() * 500) {
+                this.turn();
+            }
+
+            // Boundary Check (Local to parent Enclosure)
+            // New 8x8m enclosure centered at (0,0,4) roughly
+            // Bounds: X [-3.5, 3.5], Z [0.5, 7.5]
+            var pos = this.el.object3D.position;
+            if (pos.x < -3.5 || pos.x > 3.5 || pos.z < 0.5 || pos.z > 7.5) {
+                // Too close to fence, turn around!
+                this.el.object3D.rotation.y += Math.PI + (Math.random() - 0.5);
+                // Clamp position
+                pos.x = Math.max(-3.4, Math.min(3.4, pos.x));
+                pos.z = Math.max(0.6, Math.min(7.4, pos.z));
+                this.turnTimer = 0;
+            }
+        },
+        turn: function() {
+            this.el.object3D.rotation.y += (Math.random() - 0.5) * 2;
+            this.turnTimer = 0;
+        }
+      });
+
+      // CAT AI - Linear Patrol (Back and Forth)
+      AFRAME.registerComponent("cat-ai", {
+        init: function () {
+            this.speed = 0.02; // Faster
+            this.maxDist = 5;  // 5 meters range
+            this.startPos = this.el.object3D.position.clone();
+            // Start moving forward?
+        },
+        tick: function () {
+            // Move forward (Positive Z seems to be forward for this specific model)
+            this.el.object3D.translateZ(this.speed);
+            
+            // Check distance from start
+            var dist = this.el.object3D.position.distanceTo(this.startPos);
+            if (dist > this.maxDist) {
+                // Turn 180 degrees
+                this.el.object3D.rotation.y += Math.PI;
+                // Reset/Clamp slightly to prevent getting stuck if logic overshoots
+                // But simple rotation is enough, it will walk back
+            }
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <a-scene background="color: #87CEEB">
+      <a-assets>
+        <!-- Modèles 3D Extracted -->
+        <a-asset-item id="fenceModel" src="./assets/models/fence.glb"></a-asset-item>
+        <a-asset-item id="wildebeestModel" src="./assets/models/wildebeest.glb"></a-asset-item>
+        <a-asset-item id="chatModel" src="./assets/models/cat.glb"></a-asset-item>
+        <a-asset-item id="stickModel" src="./assets/models/Stick.glb"></a-asset-item>
+        <a-asset-item id="hatModel" src="./assets/models/hat.glb"></a-asset-item>
+
+        <!-- Mixins Extracted -->
+        <a-mixin
+            id="stickMixin"
+            gltf-model="#stickModel"
+            scale="1 1 1"
+        ></a-mixin>
+
+        <a-mixin
+            id="hatMixin"
+            gltf-model="#hatModel"
+            scale="1 1 1"
+        ></a-mixin>
+      </a-assets>
+
+      <!-- LIGHTING -->
+      <a-entity light="type: ambient; color: #FFF; intensity: 0.7"></a-entity>
+      <a-entity light="type: directional; color: #FFF; intensity: 1" position="-1 1 0.5"></a-entity>
+
+      <!-- GROUND (Simple Reference) -->
+      <a-plane color="#7BC8A4" rotation="-90 0 0" width="30" height="30"></a-plane>
+
+      <!-- 1. ENCLOS & WILDEBEESTS -->
+      <!-- Position further back (2 0 -16) as requested -->
+      <a-entity position="2 0 -10" id="enclosArea">
+        <!-- Carré de 8x8m (2 panneaux par côté) -->
+        
+        <!-- Façade (Z=0) covers X[-4, 4] -->
+        <a-entity gltf-model="#fenceModel" position="-2 0 0" scale="1 0.9 1"></a-entity>
+        <a-entity gltf-model="#fenceModel" position="2 0 0" scale="1 0.9 1"></a-entity>
+        
+        <!-- Arrière (Z=8) -->
+        <a-entity gltf-model="#fenceModel" position="-2 0 8" scale="1 0.9 1" rotation="0 180 0"></a-entity>
+        <a-entity gltf-model="#fenceModel" position="2 0 8" scale="1 0.9 1" rotation="0 180 0"></a-entity>
+        
+        <!-- Gauche (X=-4) covers Z[0, 8] -->
+        <a-entity gltf-model="#fenceModel" position="-4 0 2" scale="1 0.9 1" rotation="0 90 0"></a-entity>
+        <a-entity gltf-model="#fenceModel" position="-4 0 6" scale="1 0.9 1" rotation="0 90 0"></a-entity>
+        
+        <!-- Droite (X=4) -->
+        <a-entity gltf-model="#fenceModel" position="4 0 2" scale="1 0.9 1" rotation="0 90 0"></a-entity>
+        <a-entity gltf-model="#fenceModel" position="4 0 6" scale="1 0.9 1" rotation="0 90 0"></a-entity>
+
+        <!-- 2 Gnous (Wildebeests) - Inside pen -->
+        <a-entity
+          id="gnou1"
+          gltf-model="#wildebeestModel"
+          position="0 0 4"
+          scale="0.7 0.7 0.7"
+          animation-mixer="clip: *walk*; loop: repeat; timeScale: 1.0"
+          wildebeest-ai
+        ></a-entity>
+        <a-entity
+          id="gnou2"
+          gltf-model="#wildebeestModel"
+          position="2 0 5"
+          scale="0.7 0.7 0.7"
+          animation-mixer="clip: *walk*; loop: repeat; timeScale: 0.9"
+          wildebeest-ai
+        ></a-entity>
+      </a-entity>
+
+      <!-- 2. LE CHAT -->
+      <!-- Scale 0.05. Rehaussé Y=0.15 pour ne pas être enterré -->
+      <!-- PATROL AI: Linear walk with turn -->
+      <a-entity
+        gltf-model="#chatModel"
+        position="-5 0 -5"
+        scale="0.0024 0.0024 0.0024"
+        rotation="0 90 0"
+        animation-mixer="clip: *; loop: repeat; timeScale: 2.0"
+        cat-ai
+      ></a-entity>
+
+      <!-- 3. LOOT (Batons & Chapeaux) -->
+      <!-- Baton -->
+      <a-entity
+        mixin="stickMixin"
+        position="-2 1 -2"
+        rotation="90 0 45"
+      ></a-entity>
+
+      <!-- Chapeau -->
+      <a-entity
+          mixin="hatMixin"
+          position="-1 0 -2"
+          scale="0.2 0.2 0.2"
+      ></a-entity>
+
+    </a-scene>
+  </body>
+</html>
