@@ -1,17 +1,14 @@
 <!DOCTYPE html>
 <html lang="fr">
-  <head>
-    <meta charset="utf-8" />
+<head>
+    <meta charset="utf-8">
     <title>La Prairie Pluvieuse - VR</title>
-    <meta
-      name="description"
-      content="Environnement VR immersif avec physique"
-    />
-
+    <meta name="description" content="Environnement VR immersif avec physique">
+    
     <!-- 1. IMPORT A-FRAME & LIBRARIES -->
     <!-- A-Frame Core -->
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-
+    
     <!-- A-Frame Extras (Animation, Controls, etc.) -->
     <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.0.0/dist/aframe-extras.min.js"></script>
 
@@ -26,6 +23,209 @@
     <!-- Custom User Scripts -->
     <!-- Custom User Scripts -->
     <script src="./assets/js/christmas-utils.js"></script>
+    <!-- Script introuvable : <script src="./research/physics-ammo/move-objects-ph3.js"></script> -->
+
+    <script>
+        // Configuration simple pour la pluie (sera lancée plus bas)
+        AFRAME.registerComponent('rain-drop', {
+            init: function() {
+                this.reset();
+            },
+            tick: function() {
+                this.el.object3D.position.y -= 0.1;
+                if (this.el.object3D.position.y < 0) {
+                    this.reset();
+                }
+            },
+            reset: function() {
+                // Position aléatoire autour du joueur (zone 20x20)
+                var x = (Math.random() - 0.5) * 20;
+                var z = (Math.random() - 0.5) * 20;
+                var y = 10 + Math.random() * 5;
+                this.el.object3D.position.set(x, y, z);
+            }
+        });
+    </script>
+</head>
+<body>
+    <!-- Config Scene avec Physique Ammo (Sans fog pour ciel net) -->
+    <a-scene 
+        physics="driver: ammo; debug: false; gravity: -9.8"
+        renderer="antialias: false; colorManagement: true; sortObjects: true">
+
+        <!-- 2. ASSETS -->
+        <a-assets>
+            <!-- Texture Sol Réaliste (CDN Three.js) -->
+            <img id="grassTexture" src="https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/terrain/grasslight-big.jpg">
+            
+            <!-- Modèles 3D -->
+            <a-asset-item id="grassModel" src="./assets/models/Grass.glb"></a-asset-item>
+            <a-asset-item id="barnModel" src="./assets/models/wooden_barn.glb"></a-asset-item>
+            <a-asset-item id="fenceModel" src="./assets/models/fence.glb"></a-asset-item>
+            <a-asset-item id="wildebeestModel" src="./assets/models/wildebeest.glb"></a-asset-item>
+            <a-asset-item id="treeModel" src="./assets/models/Tree.glb"></a-asset-item>
+            <a-asset-item id="bushModel" src="./assets/models/bush.glb"></a-asset-item>
+            <a-asset-item id="stickModel" src="./assets/models/Stick.glb"></a-asset-item>
+            <a-asset-item id="crateModel" src="./assets/models/Crate.glb"></a-asset-item>
+            <a-asset-item id="hatModel" src="./assets/models/hat.glb"></a-asset-item>
+            <a-asset-item id="sunModel" src="./assets/models/Sun.glb"></a-asset-item>
+            <a-asset-item id="chatModel" src="./assets/models/chat.glb"></a-asset-item>
+            <a-asset-item id="swingModel" src="./assets/models/balancoire.glb"></a-asset-item>
+
+            <!-- Mixins Physiques & Interactions -->
+            <!-- Objet attrapable standard -->
+            <a-mixin id="grabbable" 
+                movement="type: grabbable; stickiness: stickable"
+                ammo-shape="type: hull"
+                ammo-body="type: dynamic; mass: 1">
+            </a-mixin>
+
+            <a-mixin id="grassMixin" gltf-model="#grassModel" scale="0.1 0.1 0.1"></a-mixin>
+
+            <a-mixin id="stickMixin" 
+                gltf-model="#stickModel" 
+                scale="1 1 1"
+                mixin="grabbable">
+            </a-mixin>
+
+            <a-mixin id="hatMixin"
+                gltf-model="#hatModel"
+                scale="1 1 1"
+                mixin="grabbable">
+            </a-mixin>
+
+            <!-- Mixins Christmas (Image User) -->
+            <a-mixin id="coal" material="color:black" 
+                     geometry="primitive:sphere; segments-height:7; segments-width:13; radius:0.04"
+                     movement="type:grabbable; stickiness:stickable"
+                     ammo-shape="type:sphere; fit:manual; sphereRadius:0.04"
+                     ammo-body="type:dynamic; mass:0.1">
+            </a-mixin>
+            <a-mixin id="branch" material="color:#5C4033" 
+                     geometry="primitive:branch" scale="0.2 0.2 0.2"
+                     movement="type:grabbable; stickiness:stickable"
+                     ammo-shape="type:hull"
+                     ammo-body="type:dynamic; mass:0.1">
+            </a-mixin>
+
+            <!-- Mixin Arbre (Décor) -->
+            <a-mixin id="treeMixin"
+                gltf-model="#treeModel"
+                scale="3 3 3"
+                ammo-body="type: static" 
+                ammo-shape="type: cylinder">
+            </a-mixin>
+
+            <!-- Mixin Bush (Petit buisson) -->
+            <a-mixin id="bushMixin"
+                gltf-model="#bushModel"
+                scale="0.02 0.02 0.02" 
+                ammo-body="type: static" 
+                ammo-shape="type: box">
+            </a-mixin>
+        </a-assets>
+
+        <!-- 3. ENVIRONNEMENT -->
+        <!-- Ciel Ensoleillé (Bleu pur) -->
+        <a-sky color="#87CEEB"></a-sky>
+
+        <!-- Soleil -->
+        <a-entity gltf-model="#sunModel" position="-20 50 -30" scale="5 5 5"></a-entity>
+        
+        <!-- Lumière -->
+        <a-entity light="type: ambient; color: #FFF; intensity: 0.7"></a-entity>
+        <a-entity light="type: directional; color: #FFF; intensity: 1; castShadow: false" position="-1 1 0.5"></a-entity>
+
+        <a-plane 
+            src="#grassTexture"
+            rotation="-90 0 0" 
+            width="100" 
+            height="100" 
+            repeat="20 20"
+            material="roughness: 1; metalness: 0"
+            ammo-body="type: static" 
+            ammo-shape="type: box">
+        </a-plane>
+
+        <!-- 4. ÉLÉMENTS SCÉNIQUES -->
+        <!-- Hangar -->
+        <a-entity gltf-model="#barnModel" position="-10 0 -15" scale="2 2 2" 
+            ammo-body="type: static" 
+            ammo-shape="type: box; fit: manual; halfExtents: 5 4 5; offset: 0 4 0">
+        </a-entity>
+        <!-- Example grabbable object (desktop + VR) - moved away from keyboard -->
+        <a-box grabbable class="grabbable clickable" position="0 1.2 -2.5" depth="0.25" height="0.25" width="0.25" color="#4CC3D9" material="metalness:0.2; roughness:0.6"></a-box>
+
+        <!-- Balançoire (Devant la maison) -->
+        <!-- Réduite de 15% addtionnelle (0.02 * 0.85 = 0.017) -->
+        <a-entity gltf-model="#swingModel" position="-10 0 -5" rotation="0 180 0" scale="0.017 0.017 0.017"
+             ammo-body="type: static" ammo-shape="type: hull"></a-entity>
+
+        <!-- Enclos (Fence) -->
+        <a-entity position="10 0 -15" id="enclosArea">
+            <!-- Façade -->
+            <a-entity gltf-model="#fenceModel" position="0 0 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+            <a-entity gltf-model="#fenceModel" position="4 0 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+            <a-entity gltf-model="#fenceModel" position="8 0 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+            <!-- Arrière -->
+            <a-entity gltf-model="#fenceModel" position="0 0 8" rotation="0 180 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+            <a-entity gltf-model="#fenceModel" position="4 0 8" rotation="0 180 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+            <a-entity gltf-model="#fenceModel" position="8 0 8" rotation="0 180 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+            <!-- Côtés -->
+            <a-entity gltf-model="#fenceModel" position="-2 0 2" rotation="0 90 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+            <a-entity gltf-model="#fenceModel" position="-2 0 6" rotation="0 90 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+            <a-entity gltf-model="#fenceModel" position="10 0 2" rotation="0 90 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+            <a-entity gltf-model="#fenceModel" position="10 0 6" rotation="0 90 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
+            
+            <!-- Single Gnou (Wildebeest) -->
+            <a-entity id="gnou" gltf-model="#wildebeestModel" position="4 0 4" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 1.0"></a-entity>
+        </a-entity>
+
+        <!-- Végétation & Loot -->
+        <a-entity position="0 0 0" id="vegetation"></a-entity>
+
+        <!-- LE CHAT -->
+        <!-- Scale 0.05. Rehaussé Y=0.15 pour ne pas être enterré -->
+        <a-entity gltf-model="#chatModel" position="-12 0.50 -11" scale="0.02 0.02 0.02" rotation="0 45 0" 
+                  ammo-body="type: static" ammo-shape="type: hull"></a-entity>
+
+        <!-- 5. LA CAISSE SPÉCIALE INTERACTIVE -->
+        <a-entity position="-6 0 -11"> 
+            <!-- Caisse en bois -->
+            <a-entity gltf-model="#crateModel" 
+                id="mainCrate"
+                scale="1 1 1"
+                ammo-body="type: static" 
+                ammo-shape="type: box"
+                movement="type: static; stickiness: sticky" 
+                position="0 0 0">
+            </a-entity>
+
+            <!-- Objets posés SUR la caisse -->
+            <!-- Chapeau : Taille réduite (0.2) et posé dessus -->
+            <a-entity mixin="hatMixin" position="0 1.0 0" scale="0.2 0.2 0.2"></a-entity>
+            <!-- Baton -->
+            <a-entity mixin="stickMixin" position="0.5 1.0 0.2" rotation="0 90 0"></a-entity>
+            <!-- 3. Coal & Branch (Nouveaux) -->
+            <a-entity mixin="coal" position="-0.3 1.05 0.2"></a-entity>
+            <a-entity mixin="branch" position="0.3 1.02 -0.2" rotation="90 0 0"></a-entity>
+        </a-entity>
+
+        <!-- 6. JOUEUR (RIG CAMERA) -->
+        <a-entity id="rig">
+            <a-camera id="camera" position="0 1.6 0" look-controls wasd-controls>
+                <!-- Allow desktop cursor to hit grabbable objects too -->
+                <a-entity cursor="rayOrigin: mouse" raycaster="objects: .grabbable, .clickable"></a-entity>
+            </a-camera>
+            <a-entity id="lhand" hand-controls="hand: left" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: [ammo-shape]" visible="true" grabber raycaster="objects: .grabbable, .clickable; showLine: false"></a-entity>
+            <a-entity id="rhand" hand-controls="hand: right" visible="true" grabber raycaster="objects: .grabbable, .clickable; showLine: false"></a-entity>
+            <!-- Laser controls for pointer interaction with keys -->
+            <a-entity laser-controls="hand: right" raycaster="objects: .clickable"></a-entity>
+            <a-entity laser-controls="hand: left" raycaster="objects: .clickable"></a-entity>
+        </a-entity>
+        
+        
+    
     <script src="./assets/js/christmas-utils.js"></script>
     <!-- Script introuvable : <script src="./research/physics-ammo/move-objects-ph3.js"></script> -->
 
@@ -483,6 +683,636 @@
 
     <!-- Script de génération procédurale & Animation -->
     <script>
+
+        // Génération Pluie
+        function createRain() {
+            var scene = document.querySelector('a-scene');
+            var rainCount = 200; // OPTIMISATION : Grosses économies CPU/GPU
+            for(var i=0; i<rainCount; i++) {
+                var drop = document.createElement('a-entity');
+                drop.setAttribute('geometry', 'primitive: box; height: 0.1; width: 0.01; depth: 0.01');
+                drop.setAttribute('material', 'color: #AACCFF; opacity: 0.6; transparent: true');
+                drop.setAttribute('rain-drop', '');
+                scene.appendChild(drop);
+            }
+        }
+        
+        // Végétation (Arbres Decor & Bush Sol)
+        function createVegetation() {
+            var container = document.querySelector('#vegetation');
+
+            // 1. ARBRES (Décor Naturel autour)
+            // On veut une disposition aléatoire mais qui laisse le centre (Maison/Enclos) dégagé.
+            // Centre approximatif de la zone de vie : x=0, z=-10
+            var treeCount = 32;
+            var trees = [];
+            
+            for(var i=0; i<treeCount; i++) {
+                var valid = false, attempts = 0;
+                var x, z;
+
+                while(!valid && attempts < 50) {
+                    // Zone large de 80x80
+                    x = (Math.random() - 0.5) * 80;
+                    z = (Math.random() - 0.5) * 80; // Centré autour de 0,0
+
+                    // Calcul distance au centre de la zone de vie (0, -10)
+                    var dist = Math.sqrt((x - 0)**2 + (z - -10)**2);
+
+                    // REGLE : On veut les arbres LOIN du centre (> 25m) et pas trop proches les uns des autres
+                    if(dist > 25) { 
+                        valid = true;
+                        // Check anti-collision entre arbres
+                        for(var t=0; t<trees.length; t++) {
+                            if(Math.hypot(x-trees[t].x, z-trees[t].z) < 5) { valid = false; break; }
+                        }
+                    }
+                    attempts++;
+                }
+
+                if(valid) {
+                    trees.push({x:x, z:z});
+                    var tree = document.createElement('a-entity');
+                    tree.setAttribute('mixin', 'treeMixin');
+                    // Scale augmenté ENCORE de 30% (Total: 1.69)
+                    var s = (1.0 + Math.random() * 1.5) * 3; 
+                    // CORRECTION: position Y levée selon le scale (approx pivot centré)
+                    tree.setAttribute('position', {x: x, y: s * 1, z: z});
+                    tree.setAttribute('scale', {x: s, y: s, z: s});
+                    tree.setAttribute('rotation', {x: 0, y: Math.random()*360, z: 0});
+                    container.appendChild(tree);
+                }
+            }
+
+            // 2. BUSHES (Buissons au sol aléatoires)
+            // Ils peuvent être un peu plus proches, pour habiller le sol
+            var bushCount = 80; // OPTIMISATION
+            var isForbidden = function(x, z) {
+                // Zone stricte maison/enclos pour ne pas clipper dedans
+                // (x: -12 à 20, z: -20 à -5)
+                return (x > -12 && x < 20 && z > -20 && z < -5);
+            };
+
+            for(var k=0; k<bushCount; k++) {
+                var x = (Math.random() - 0.5) * 70;
+                var z = (Math.random() - 0.5) * 70;
+                
+                if(!isForbidden(x,z)) {
+                   var bush = document.createElement('a-entity');
+                   bush.setAttribute('mixin', 'bushMixin');
+                   bush.setAttribute('position', {x: x, y: 0, z: z});
+                   // Scale augmenté car 0.02 était invisible. 
+                   // On tente 0.5 à 0.8
+                   var s = 0.5 + Math.random() * 0.5; 
+                   bush.setAttribute('scale', {x: s, y: s, z: s});
+                   bush.setAttribute('rotation', {x: 0, y: Math.random()*360, z: 0});
+                   container.appendChild(bush);
+                }
+            }
+
+            // 3. Herbe & Batons
+            var grassCount = 150; // OPTIMISATION
+            for(var j=0; j<grassCount; j++) {
+                var angleG = Math.random() * Math.PI * 2;
+                var radiusG = 2 + Math.random() * 45; 
+                var xG = Math.cos(angleG) * radiusG;
+                var zG = Math.sin(angleG) * radiusG;
+                var grass = document.createElement('a-entity');
+                grass.setAttribute('mixin', 'grassMixin');
+                grass.setAttribute('position', {x: xG, y: 0, z: zG});
+                grass.setAttribute('rotation', {x: 0, y: Math.random()*360, z: 0});
+                container.appendChild(grass);
+            }
+
+             // Batons (Loot)
+             var stickCount = 10;
+            for(var l=0; l<stickCount; l++) {
+                var x = (Math.random() - 0.5) * 60;
+                var z = (Math.random() - 0.5) * 60;
+                if(!isForbidden(x,z)) {
+                    var stick = document.createElement('a-entity');
+                    stick.setAttribute('mixin', 'stickMixin');
+                    stick.setAttribute('position', {x: x, y: 0.1, z: z}); // Pose au sol
+                    stick.setAttribute('rotation', {x: 90, y: Math.random()*360, z: 0});
+                    container.appendChild(stick);
+                }
+            }
+        }
+
+        // Animation Gnous (5)
+        function animateGnous() {
+            var gnous = [
+                document.querySelector('#gnou1'),
+                document.querySelector('#gnou2'),
+                document.querySelector('#gnou3'),
+                document.querySelector('#gnou4'),
+                document.querySelector('#gnou5')
+            ];
+
+            var t = 0;
+            setInterval(function() {
+                t += 0.02;
+                gnous.forEach(function(g, index) {
+                    if(g && g.object3D) {
+                        // Varie Rayon et Phase
+                        var offset = index * (Math.PI * 2 / 5);
+                        var r = 2.5 + (index % 2) * 1; 
+                        
+                        var x = 4 + Math.cos(t * 0.5 + offset) * r;
+                        var z = 4 + Math.sin(t * 0.5 + offset) * r;
+                        
+                        g.object3D.position.set(x, 0, z);
+                        // Orientation: Regarder vers l'avant de la marche
+                        // Tangente au cercle
+                        var angle = t * 0.5 + offset;
+                        // En A-Frame Rotation Y: 0 = -Z, 90 = -X...
+                        // Angle maths: 0 = +X.
+                        // Pour regarder "devant" sur le cercle trigonométrique (sens anti-horaire):
+                        // Rotation = -Angle + PI (ou similaire).
+                        // On ajuste expérimentalement si "à l'envers".
+                        // Essayons Rotation Y = -Angle
+                        g.object3D.rotation.y = -angle;
+                    }
+                });
+            }, 50);
+        }
+
+        // --- Grab system: components `grabbable` and `grabber` ---
+        // Grabbable: attach this component (and optionally class="grabbable") to any entity
+        // Grabber: attach to a hand entity or camera to enable grabbing with trigger/grip or mouse
+        (function(){
+            AFRAME.registerComponent('grabbable', {
+                schema: {},
+                init: function() {
+                    // Track which entity currently grabs this one (null if free)
+                    this.grabbedBy = null;
+                },
+                isGrabbed: function() {
+                    return !!this.grabbedBy;
+                },
+                grab: function(byEl) {
+                    if (this.grabbedBy) return false; // already grabbed
+                    this.grabbedBy = byEl;
+                    this.el.classList.add('is-grabbed');
+                    this.el.emit('grab-start', { by: byEl });
+                    console.log('[grabbable] grabbed by', byEl && byEl.id ? byEl.id : byEl);
+                    return true;
+                },
+                release: function() {
+                    var prev = this.grabbedBy;
+                    this.grabbedBy = null;
+                    this.el.classList.remove('is-grabbed');
+                    this.el.emit('grab-end', { by: prev });
+                    console.log('[grabbable] released by', prev && prev.id ? prev.id : prev);
+                }
+            });
+
+            // Highlightable: toggle emissive highlight on demand via events
+            AFRAME.registerComponent('highlightable', {
+                schema: { color: { type: 'color', default: '#00ffd0' }, intensity: { type: 'number', default: 0.6 } },
+                init: function() {
+                    this._originals = [];
+                    this._highlighted = false;
+                    this.onHighlightOn = this.onHighlightOn.bind(this);
+                    this.onHighlightOff = this.onHighlightOff.bind(this);
+                    this.el.addEventListener('highlight-on', this.onHighlightOn);
+                    this.el.addEventListener('highlight-off', this.onHighlightOff);
+                },
+                remove: function() {
+                    this.el.removeEventListener('highlight-on', this.onHighlightOn);
+                    this.el.removeEventListener('highlight-off', this.onHighlightOff);
+                    if (this._highlighted) this._restore();
+                },
+                onHighlightOn: function() { this._apply(); },
+                onHighlightOff: function() { this._restore(); },
+                _apply: function() {
+                    if (this._highlighted) return;
+                    var color = new THREE.Color(this.data.color);
+                    this.el.object3D.traverse(function(node){
+                        if (node.isMesh && node.material) {
+                            // store original emissive & intensity
+                            var mat = node.material;
+                            this._originals.push({ node: node, emissive: mat.emissive ? mat.emissive.clone() : new THREE.Color(0x000000), emissiveIntensity: mat.emissiveIntensity || 0 });
+                            if (mat.emissive) mat.emissive.copy(color); else mat.emissive = color.clone();
+                            mat.emissiveIntensity = this.data.intensity;
+                            mat.needsUpdate = true;
+                        }
+                    }.bind(this));
+                    this._highlighted = true;
+                },
+                _restore: function() {
+                    if (!this._highlighted) return;
+                    this._originals.forEach(function(orig){
+                        if (orig.node && orig.node.material) {
+                            var mat = orig.node.material;
+                            if (orig.emissive) mat.emissive.copy(orig.emissive);
+                            mat.emissiveIntensity = orig.emissiveIntensity || 0;
+                            mat.needsUpdate = true;
+                        }
+                    });
+                    this._originals = [];
+                    this._highlighted = false;
+                }
+            });
+
+            // Thrown fallback: apply simple kinematic velocity when physics not available
+            AFRAME.registerComponent('thrown', {
+                schema: {
+                    v: { type: 'vec3' },
+                    life: { type: 'number', default: 1.5 }
+                },
+                init: function() {
+                    this.age = 0;
+                    this.velocity = new THREE.Vector3(this.data.v.x, this.data.v.y, this.data.v.z);
+                },
+                tick: function(time, delta) {
+                    var dt = delta / 1000;
+                    this.age += dt;
+                    if (this.age > this.data.life) {
+                        this.el.removeAttribute('thrown');
+                        return;
+                    }
+                    // simple gravity
+                    this.velocity.y -= 9.8 * dt;
+                    var pos = this.el.object3D.position;
+                    pos.x += this.velocity.x * dt;
+                    pos.y += this.velocity.y * dt;
+                    pos.z += this.velocity.z * dt;
+                    this.el.object3D.position.copy(pos);
+                    this.el.object3D.updateMatrixWorld(true);
+                }
+            });
+
+            AFRAME.registerComponent('grabber', {
+                schema: {},
+                init: function() {
+                    this.grabbedEl = null;
+                    this.offsetMatrix = new THREE.Matrix4();
+                    this.invHandMatrix = new THREE.Matrix4();
+                    this.tempMatrix = new THREE.Matrix4();
+                    // store original physics attributes for grabbed entities
+                    this._grabbedOriginals = new WeakMap();
+                    // hand motion history for throw velocity
+                    this._handHistory = [];
+                    this._maxHistory = 6; // samples
+                    this._lastClickTime = 0;
+
+                    this.onDown = this.onDown.bind(this);
+                    this.onUp = this.onUp.bind(this);
+                    this.onCursorClick = this.onCursorClick.bind(this);
+
+                    this.el.addEventListener('triggerdown', this.onDown);
+                    this.el.addEventListener('gripdown', this.onDown);
+                    this.el.addEventListener('triggerup', this.onUp);
+                    this.el.addEventListener('gripup', this.onUp);
+
+                    var scene = this.el.sceneEl;
+                    this._cursor = scene && scene.querySelector('[cursor]');
+                    if (this._cursor) {
+                        this._cursor.addEventListener('click', this.onCursorClick);
+                        this.onCursorDoubleClick = this.onCursorDoubleClick.bind(this);
+                        this._cursor.addEventListener('dblclick', this.onCursorDoubleClick);
+                    }
+
+                    window.addEventListener('mouseup', this.onUp);
+                },
+
+                remove: function() {
+                    this.el.removeEventListener('triggerdown', this.onDown);
+                    this.el.removeEventListener('gripdown', this.onDown);
+                    this.el.removeEventListener('triggerup', this.onUp);
+                    this.el.removeEventListener('gripup', this.onUp);
+                    if (this._cursor) this._cursor.removeEventListener('click', this.onCursorClick);
+                    window.removeEventListener('mouseup', this.onUp);
+                },
+
+                onDown: function(evt) {
+                    console.log('[grabber] onDown', this.el.id || this.el);
+                    if (this.grabbedEl) return;
+                    // controller input
+                    this._lastInputWasCursor = false;
+
+                    if (evt && evt.detail && evt.detail.intersectedEl) {
+                        console.log('[grabber] event provided intersectedEl', evt.detail.intersectedEl.id || evt.detail.intersectedEl);
+                        this._tryGrabCandidate(evt.detail.intersectedEl);
+                        return;
+                    }
+
+                    var rc = this.el.components && this.el.components.raycaster;
+                    var intersections = [];
+                    try {
+                        intersections = rc && rc.intersections ? rc.intersections : [];
+                    } catch(e) {
+                        console.warn('[grabber] raycaster read failed', e);
+                    }
+
+                    if (!intersections || !intersections.length) return;
+
+                    for (var i = 0; i < intersections.length; i++) {
+                        var obj = intersections[i].object;
+                        var candidate = obj && obj.el ? obj.el : null;
+                        if (!candidate) continue;
+                        console.log('[grabber] intersection candidate', candidate.id || candidate);
+                        this._tryGrabCandidate(candidate);
+                        if (this.grabbedEl) return;
+                    }
+                },
+
+                onCursorClick: function(evt) {
+                    console.log('[grabber] onCursorClick');
+                    // double-click detection (manual): two clicks within 350ms
+                    var now = performance.now();
+                    var isDouble = (now - (this._lastClickTime || 0)) < 350;
+                    this._lastClickTime = now;
+
+                    // mark that this click came from cursor
+                    this._lastInputWasCursor = true;
+
+                    // resolve candidate from event or raycaster fallback
+                    var cand = null;
+                    if (evt && evt.detail && evt.detail.intersectedEl) {
+                        cand = evt.detail.intersectedEl;
+                    } else if (this._cursor && this._cursor.components && this._cursor.components.raycaster) {
+                        try {
+                            var ints = this._cursor.components.raycaster.intersections || [];
+                            if (ints.length) cand = ints[0].object && ints[0].object.el ? ints[0].object.el : null;
+                        } catch(e) { console.warn('[grabber] reading cursor intersections failed', e); }
+                    }
+
+                    // If already holding and grabbed by cursor, allow double-click to release
+                    if (this.grabbedEl && this._grabbedByCursor) {
+                        if (isDouble) {
+                            console.log('[grabber] cursor double-click -> release');
+                            this.onUp({ type: 'dblclick' });
+                        } else {
+                            console.log('[grabber] cursor click while holding (waiting for dblclick)');
+                        }
+                        return;
+                    }
+
+                    // If already holding with controller, ignore cursor click
+                    if (this.grabbedEl && !this._grabbedByCursor) {
+                        console.log('[grabber] cursor click ignored; holding with controller');
+                        return;
+                    }
+
+                    if (isDouble) {
+                        // double-click while not holding -> try grab then immediately release
+                        if (cand) {
+                            console.log('[grabber] cursor double-click attempting quick grab', cand.id || cand);
+                            this._tryGrabCandidate(cand);
+                        }
+                        return;
+                    }
+
+                    // single click -> attempt grab
+                    if (cand) {
+                        console.log('[grabber] cursor intersected', cand.id || cand);
+                        this._tryGrabCandidate(cand);
+                    } else {
+                        console.log('[grabber] cursor click but no intersectedEl found');
+                    }
+                },
+
+                onCursorDoubleClick: function(evt) {
+                    // double-click: if holding via cursor, release; otherwise try grab
+                    console.log('[grabber] onCursorDoubleClick');
+                    if (this.grabbedEl && this._grabbedByCursor) {
+                        // call onUp with synthetic dblclick event so release runs
+                        this.onUp({ type: 'dblclick' });
+                        return;
+                    }
+                    // not holding: behave like a click attempt to grab
+                    var cand = evt && evt.detail && evt.detail.intersectedEl ? evt.detail.intersectedEl : null;
+                    if (cand) {
+                        this._lastInputWasCursor = true;
+                        this._tryGrabCandidate(cand);
+                    }
+                },
+
+                // sample hand position each tick even when not grabbing
+                _sampleHand: function(now) {
+                    try {
+                        var p = new THREE.Vector3();
+                        this.el.object3D.getWorldPosition(p);
+                        this._handHistory.push({ p: p.clone(), t: now });
+                        if (this._handHistory.length > this._maxHistory) this._handHistory.shift();
+                    } catch(e) { /* ignore */ }
+                },
+
+                _tryGrabCandidate: function(candidate) {
+                    var el = candidate;
+                    while (el && el.tagName && el.tagName.toLowerCase() !== 'a-scene') {
+                        if (el.components && el.components.grabbable) break;
+                        if (el.classList && el.classList.contains('grabbable')) break;
+                        el = el.parentEl;
+                    }
+                    if (!el || el.tagName.toLowerCase() === 'a-scene') return;
+
+                    console.log('[grabber] resolved candidate to', el.id || el);
+
+                    if (el.components && el.components.grabbable) {
+                        if (!el.components.grabbable.isGrabbed()) {
+                            this._grab(el);
+                        }
+                    } else if (el.classList && el.classList.contains('grabbable')) {
+                        el.setAttribute('grabbable', '');
+                        if (!el.components.grabbable.isGrabbed()) this._grab(el);
+                    }
+                },
+
+                _grab: function(targetEl) {
+                    if (!targetEl) return;
+                    console.log('[grabber] grabbing', targetEl.id || targetEl);
+                    if (targetEl.components && targetEl.components.grabbable) {
+                        var ok = targetEl.components.grabbable.grab(this.el);
+                        if (!ok) { console.log('[grabber] grab denied by component'); return; }
+                    } else {
+                        targetEl.setAttribute('grabbable', '');
+                        targetEl.components.grabbable.grab(this.el);
+                    }
+
+                    // If object has physics, store original ammo-body and set to kinematic
+                    try {
+                        if (targetEl.hasAttribute && targetEl.hasAttribute('ammo-body')) {
+                            var orig = targetEl.getAttribute('ammo-body');
+                            this._grabbedOriginals.set(targetEl, { 'ammo-body': orig });
+                            targetEl.setAttribute('ammo-body', 'type: kinematic; mass: 0');
+                            console.log('[grabber] set ammo-body to kinematic for', targetEl.id || targetEl);
+                        }
+                    } catch(e) { console.warn('[grabber] error toggling ammo-body', e); }
+
+                    // compute offset matrix: inv(handWorld) * objectWorld
+                    try {
+                        this.invHandMatrix.copy(this.el.object3D.matrixWorld).invert();
+                        this.offsetMatrix.copy(this.invHandMatrix).multiply(targetEl.object3D.matrixWorld);
+                    } catch(e) {
+                        console.warn('[grabber] matrix invert/multiply failed', e);
+                        this.offsetMatrix.identity();
+                    }
+
+                    this.grabbedEl = targetEl;
+                    // remember if this grab came from cursor input
+                    this._grabbedByCursor = !!this._lastInputWasCursor;
+                    this.grabbedEl.emit('grabbed', { by: this.el });
+                },
+
+                onUp: function(evt) {
+                    console.log('[grabber] onUp');
+                    if (!this.grabbedEl) return;
+                    // if grabbed via cursor, only accept dblclick release
+                    if (this._grabbedByCursor && !(evt && evt.type === 'dblclick')) {
+                        console.log('[grabber] ignoring mouseup because release requires dblclick');
+                        return;
+                    }
+
+                    // compute throw velocity from history
+                    var now = performance.now() / 1000;
+                    // include latest sample
+                    this._sampleHand(now);
+                    var hist = this._handHistory;
+                    var vx = 0, vy = 0, vz = 0;
+                    if (hist.length >= 2) {
+                        var first = hist[0];
+                        var last = hist[hist.length - 1];
+                        var dt = last.t - first.t;
+                        if (dt <= 0) dt = 0.016;
+                        vx = (last.p.x - first.p.x) / dt;
+                        vy = (last.p.y - first.p.y) / dt;
+                        vz = (last.p.z - first.p.z) / dt;
+                    }
+                    var throwFactor = 1.5;
+                    var throwVel = new THREE.Vector3(vx * throwFactor, vy * throwFactor, vz * throwFactor);
+                    // cap
+                    var maxSpeed = 30;
+                    if (throwVel.length() > maxSpeed) throwVel.setLength(maxSpeed);
+
+                    var released = this.grabbedEl;
+                    var worldMat = new THREE.Matrix4().copy(released.object3D.matrixWorld);
+
+                    if (released.components && released.components.grabbable) released.components.grabbable.release();
+
+                    // restore original ammo-body if we modified it
+                    try {
+                        var saved = this._grabbedOriginals.get(released);
+                        if (saved && saved['ammo-body'] !== undefined) {
+                            released.setAttribute('ammo-body', saved['ammo-body']);
+                            console.log('[grabber] restored ammo-body for', released.id || released);
+                            this._grabbedOriginals.delete(released);
+                        }
+                    } catch(e) { console.warn('[grabber] restore ammo-body failed', e); }
+
+                    var sceneEl = this.el.sceneEl;
+                    sceneEl.appendChild(released);
+
+                    released.object3D.matrix.copy(worldMat);
+                    var pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scale = new THREE.Vector3();
+                    released.object3D.matrix.decompose(pos, quat, scale);
+                    released.object3D.position.copy(pos);
+                    released.object3D.quaternion.copy(quat);
+                    released.object3D.scale.copy(scale);
+                    released.object3D.updateMatrixWorld(true);
+
+                    released.emit('released', { by: this.el });
+                    console.log('[grabber] released', released.id || released, 'throwVel=', throwVel);
+                    // attempt to apply physics linear velocity if ammo is present
+                    try {
+                        // small timeout to allow physics body recreation after restoring ammo-body
+                        setTimeout(function() {
+                            try {
+                                var body = released.body || released.getAttribute && released.getAttribute('body');
+                                if (body && window.Ammo && released.body) {
+                                    var btVec = new Ammo.btVector3(throwVel.x, throwVel.y, throwVel.z);
+                                    released.body.setLinearVelocity(btVec);
+                                    // wake up
+                                    released.body.activate && released.body.activate();
+                                    console.log('[grabber] applied Ammo linear velocity');
+                                } else {
+                                    // fallback: add thrown component to simulate
+                                    released.setAttribute('thrown', { v: throwVel.x + ' ' + throwVel.y + ' ' + throwVel.z, life: 1.5 });
+                                    console.log('[grabber] applied fallback thrown component');
+                                }
+                            } catch(e) { console.warn('[grabber] apply throw failed', e); }
+                        }, 40);
+                    } catch(e) { console.warn('[grabber] scheduling throw failed', e); }
+
+                    this.grabbedEl = null;
+                    this._grabbedByCursor = false;
+                },
+
+                tick: function(time, delta) {
+                    var now = performance.now() / 1000;
+                    // always sample hand movement
+                    this._sampleHand(now);
+
+                    if (!this.grabbedEl) return;
+
+                    this.tempMatrix.copy(this.el.object3D.matrixWorld).multiply(this.offsetMatrix);
+                    var pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scale = new THREE.Vector3();
+                    this.tempMatrix.decompose(pos, quat, scale);
+
+                    // Validate computations before applying
+                    if (!isFinite(pos.x) || !isFinite(pos.y) || !isFinite(pos.z)) {
+                        console.warn('[grabber] invalid computed pos, skipping apply', pos);
+                        return;
+                    }
+                    if (!isFinite(quat.x) || !isFinite(quat.y) || !isFinite(quat.z) || !isFinite(quat.w)) {
+                        console.warn('[grabber] invalid computed quat, skipping apply', quat);
+                        return;
+                    }
+                    if (!isFinite(scale.x) || !isFinite(scale.y) || !isFinite(scale.z)) {
+                        console.warn('[grabber] invalid computed scale, using default', scale);
+                        scale.set(1,1,1);
+                    }
+
+                    this.grabbedEl.object3D.position.copy(pos);
+                    this.grabbedEl.object3D.quaternion.copy(quat);
+                    if (scale.x === 0 || scale.y === 0 || scale.z === 0) scale.set(1,1,1);
+                    this.grabbedEl.object3D.scale.copy(scale);
+                    this.grabbedEl.object3D.updateMatrixWorld(true);
+                }
+            });
+        })();
+
+        // Lancement au chargement
+        window.addEventListener('load', function () {
+            createRain();
+            createVegetation();
+            animateGnous(); 
+        });
+
+        // Fix: delay applying ammo-shape for entities that use a glTF model and the `grabbable` mixin/class.
+        // Some ammo-shape fit modes require the mesh to be present (object3DMap.mesh). When mixins
+        // apply ammo-shape before the model is loaded, the physics system throws "Cannot use FIT.ALL without object3DMap.mesh".
+        // Here we listen for `model-loaded` events and apply a sensible ammo-shape/body if missing.
+        (function(){
+            var scene = document.querySelector('a-scene');
+            if (!scene) return;
+            scene.addEventListener('model-loaded', function(evt){
+                var el = evt && evt.target;
+                if (!el) return;
+                // If element or its parents use the grabbable mixin/class, ensure ammo attributes exist
+                var checkEl = el;
+                while (checkEl && checkEl !== scene) {
+                    var mixinAttr = checkEl.getAttribute('mixin') || '';
+                    var isGrabbable = checkEl.classList && checkEl.classList.contains('grabbable') || (mixinAttr && mixinAttr.split(' ').indexOf('grabbable') !== -1);
+                    if (isGrabbable) {
+                        // If ammo-shape missing, set a default hull shape now that mesh exists
+                        if (!checkEl.hasAttribute('ammo-shape')) {
+                            checkEl.setAttribute('ammo-shape', 'type: hull');
+                        }
+                        if (!checkEl.hasAttribute('ammo-body')) {
+                            checkEl.setAttribute('ammo-body', 'type: dynamic; mass: 1');
+                        }
+                        break;
+                    }
+                    checkEl = checkEl.parentEl;
+                }
+            });
+        })();
+    </script>
+</body>
+</html>
       // Génération Pluie
       function createRain() {
         var scene = document.querySelector("a-scene");
