@@ -268,6 +268,33 @@
                 }
             });
 
+            // COMPONENT: 'Enter' Key Teleport (Simulates VR Left Hand)
+            AFRAME.registerComponent('enter-teleport-trigger', {
+                init: function() {
+                    this.onKeyDown = this.onKeyDown.bind(this);
+                    this.onKeyUp = this.onKeyUp.bind(this);
+                    window.addEventListener('keydown', this.onKeyDown);
+                    window.addEventListener('keyup', this.onKeyUp);
+                },
+                remove: function() {
+                    window.removeEventListener('keydown', this.onKeyDown);
+                    window.removeEventListener('keyup', this.onKeyUp);
+                },
+                onKeyDown: function(e) {
+                    if (e.code === 'Enter') {
+                        console.log("Enter key pressed for Teleport");
+                        var lHand = document.querySelector('#lhand');
+                        if (lHand) lHand.emit('teleportstart');
+                    }
+                },
+                onKeyUp: function(e) {
+                    if (e.code === 'Enter') {
+                        var lHand = document.querySelector('#lhand');
+                        if (lHand) lHand.emit('teleportend');
+                    }
+                }
+            });
+
             AFRAME.registerComponent('grabber', {
                 schema: {},
                 init: function() {
@@ -275,10 +302,7 @@
                     this.offsetMatrix = new THREE.Matrix4();
                     this.invHandMatrix = new THREE.Matrix4();
                     this.tempMatrix = new THREE.Matrix4();
-                    this._grabbedOriginals = new WeakMap();
-                    this._handHistory = [];
-                    this._maxHistory = 6; 
-
+                    
                     this.onDown = this.onDown.bind(this);
                     this.onUp = this.onUp.bind(this);
 
@@ -287,11 +311,15 @@
                     this.el.addEventListener('triggerup', this.onUp);
                     this.el.addEventListener('gripup', this.onUp);
 
-                    // Mouse support for PC (if attached to Cursor)
+                    // Mouse support
                     if (this.el.hasAttribute('cursor')) {
+                        this.isMouse = true;
                         window.addEventListener('mousedown', this.onDown);
                         window.addEventListener('mouseup', this.onUp);
                     }
+                    // For _sampleHand
+                    this._handHistory = [];
+                    this._maxHistory = 10;
                 },
 
                 remove: function() {
@@ -300,7 +328,6 @@
                     this.el.removeEventListener('triggerup', this.onUp);
                     this.el.removeEventListener('gripup', this.onUp);
 
-                    // Remove Mouse support
                     if (this.el.hasAttribute('cursor')) {
                         window.removeEventListener('mousedown', this.onDown);
                         window.removeEventListener('mouseup', this.onUp);
@@ -308,23 +335,36 @@
                 },
 
                 onDown: function(evt) {
-                    if (this.grabbedEl) return;
+                    if (this.isMouse) {
+                         // PC: Left Click (0)
+                         if (evt.button !== 0) return;
+                    }
 
-                    // Check for direct intersection from event (best for VR)
-                    if (evt && evt.detail && evt.detail.intersectedEl) {
-                        this._tryGrabCandidate(evt.detail.intersectedEl);
+                    // Toggle Logic
+                    if (this.grabbedEl) {
+                        if (this.isMouse) { 
+                            this.releaseObject();
+                            if (evt && evt.preventDefault) evt.preventDefault();
+                        }
                         return;
                     }
 
-                    // Fallback to raycaster check
-                    var rc = this.el.components.raycaster;
-                    var intersections = rc && rc.intersections ? rc.intersections : [];
-                    for (var i = 0; i < intersections.length; i++) {
-                        var obj = intersections[i].object;
-                        if (obj && obj.el) {
-                            this._tryGrabCandidate(obj.el);
-                            if (this.grabbedEl) return;
+                    // Grab Logic
+                    let target = null;
+                    // Preference 1: Event detail (VR direct touch)
+                    if (evt && evt.detail && evt.detail.intersectedEl) {
+                        target = evt.detail.intersectedEl;
+                    }
+                    // Preference 2: Raycaster
+                    else {
+                        var rc = this.el.components.raycaster;
+                        if (rc && rc.intersections && rc.intersections.length > 0) {
+                            target = rc.intersections[0].object.el;
                         }
+                    }
+
+                    if (target) {
+                        this._tryGrabCandidate(target);
                     }
                 },
 
@@ -337,110 +377,112 @@
                     } catch(e) { }
                 },
 
-                _tryGrabCandidate: function(candidate) {
-                    var el = candidate;
+                _tryGrabCandidate: function(el) {
+                    // Traverse up to find grabbable root
                     while (el && el.tagName && el.tagName.toLowerCase() !== 'a-scene') {
+                        // Forbidden objects
+                        if (el.id === 'barnModel' || el.id === 'treeModel' || el.id === 'physicsFloor') return;
+                        
                         if (el.components && el.components.grabbable) break;
                         if (el.classList && el.classList.contains('grabbable')) break;
                         el = el.parentEl;
                     }
                     if (!el || el.tagName.toLowerCase() === 'a-scene') return;
+                    if (el === this.grabbedEl) return;
 
-                    if (el.components && el.components.grabbable) {
-                        if (!el.components.grabbable.isGrabbed()) {
-                            this._grab(el);
-                        }
-                    } else if (el.classList && el.classList.contains('grabbable')) {
-                        el.setAttribute('grabbable', '');
-                        if (!el.components.grabbable.isGrabbed()) this._grab(el);
-                    }
+                    var isGrabbable = (el.components && el.components.grabbable) || (el.classList && el.classList.contains('grabbable'));
+                    if (!isGrabbable) return;
+
+                    console.log('[grabber] grabbing:', el.id || el.tagName);
+                    this._grab(el);
                 },
 
                 _grab: function(targetEl) {
                     if (!targetEl) return;
-                    if (targetEl.components && targetEl.components.grabbable) {
-                        var ok = targetEl.components.grabbable.grab(this.el);
-                        if (!ok) { return; }
+                    
+                    // Mark as grabbed
+                    if (targetEl.components.grabbable) {
+                         if (!targetEl.components.grabbable.grab(this.el)) return;
                     } else {
                         targetEl.setAttribute('grabbable', '');
                         targetEl.components.grabbable.grab(this.el);
                     }
 
-                    try {
-                        if (targetEl.hasAttribute && targetEl.hasAttribute('ammo-body')) {
-                            var orig = targetEl.getAttribute('ammo-body');
-                            this._grabbedOriginals.set(targetEl, { 'ammo-body': orig });
-                            targetEl.setAttribute('ammo-body', 'type: kinematic; mass: 0');
-                        }
-                    } catch(e) { }
-
-                    try {
-                        this.invHandMatrix.copy(this.el.object3D.matrixWorld).invert();
-                        this.offsetMatrix.copy(this.invHandMatrix).multiply(targetEl.object3D.matrixWorld);
-                    } catch(e) {
-                        this.offsetMatrix.identity();
+                    // Physics: Kinetic
+                    if (targetEl.hasAttribute('ammo-body')) {
+                        targetEl.removeAttribute('ammo-body');
+                        targetEl.setAttribute('ammo-body', 'type: kinematic; mass: 0');
                     }
+
+                    // Store Offset
+                    this.invHandMatrix.copy(this.el.object3D.matrixWorld).invert();
+                    this.offsetMatrix.copy(this.invHandMatrix).multiply(targetEl.object3D.matrixWorld);
 
                     this.grabbedEl = targetEl;
                     this.grabbedEl.emit('grabbed', { by: this.el });
                 },
 
                 onUp: function(evt) {
+                    if (this.isMouse) return; // Toggle only for mouse
+                    if (this.grabbedEl) this.releaseObject();
+                },
+
+                releaseObject: function() {
                     if (!this.grabbedEl) return;
-
-                    var now = performance.now() / 1000;
-                    this._sampleHand(now);
-                    
-                    // Simple Throw Logic
-                    var hist = this._handHistory;
-                    var vx = 0, vy = 0, vz = 0;
-                    if (hist.length >= 2) {
-                        var first = hist[0];
-                        var last = hist[hist.length - 1];
-                        var dt = last.t - first.t;
-                        if (dt <= 0) dt = 0.016;
-                        vx = (last.p.x - first.p.x) / dt;
-                        vy = (last.p.y - first.p.y) / dt;
-                        vz = (last.p.z - first.p.z) / dt;
-                    }
-                    var throwFactor = 1.5;
-                    var throwVel = new THREE.Vector3(vx * throwFactor, vy * throwFactor, vz * throwFactor);
-                    var maxSpeed = 20; // Cap speed
-                    if (throwVel.length() > maxSpeed) throwVel.setLength(maxSpeed);
-
                     var released = this.grabbedEl;
-                    var worldMat = new THREE.Matrix4().copy(released.object3D.matrixWorld);
+                    this.grabbedEl = null;
 
-                    if (released.components && released.components.grabbable) released.components.grabbable.release();
+                    // Release logic
+                    if (released.components.grabbable) released.components.grabbable.release();
 
-                    // Restore physics (Dynamic)
-                    released.setAttribute('ammo-body', 'type: dynamic; mass: 1');
-                    this._grabbedOriginals.delete(released);
-
+                    // 1. Calculate World Position before detaching logic
                     var sceneEl = this.el.sceneEl;
-                    sceneEl.appendChild(released);
+                    if (released.parentEl !== sceneEl) {
+                         sceneEl.appendChild(released);
+                    }
 
-                    released.object3D.matrix.copy(worldMat);
-                    var pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scale = new THREE.Vector3();
-                    released.object3D.matrix.decompose(pos, quat, scale);
-                    released.object3D.position.copy(pos);
-                    released.object3D.quaternion.copy(quat);
-                    released.object3D.scale.copy(scale);
+                    // 2. SNAP TO GROUND LOGIC
+                    var currentPos = new THREE.Vector3();
+                    released.object3D.getWorldPosition(currentPos);
+                    
+                    var safeY = currentPos.y;
+                    
+                    // Raycast down to find floor
+                    var down = new THREE.Vector3(0, -1, 0);
+                    var ray = new THREE.Raycaster(currentPos, down);
+                    var hits = ray.intersectObjects(sceneEl.object3D.children, true);
+                    
+                    for (var i=0; i<hits.length; i++) {
+                        var h = hits[i];
+                        if (h.object.el === released || released.object3D.getObjectById(h.object.id)) continue;
+                        
+                        // Check if hit is below
+                        if (h.point.y < currentPos.y) {
+                            safeY = h.point.y + 0.15; // Snap to 10cm
+                            break;
+                        }
+                    }
+                    
+                    // Apply new position
+                    released.object3D.position.set(currentPos.x, safeY, currentPos.z);
                     released.object3D.updateMatrixWorld(true);
+                    
+                    // Sync to DOM to be safe
+                    released.setAttribute('position', {x: currentPos.x, y: safeY, z: currentPos.z});
 
                     released.emit('released', { by: this.el });
                     
-                    // Apply Velocity after slight delay to ensure physics body is ready
+                    // 3. Reset Physics Velocity (No Throw)
                     setTimeout(function() {
                         if (released.body && window.Ammo) {
-                            var btVec = new Ammo.btVector3(throwVel.x, throwVel.y, throwVel.z);
-                            released.body.setLinearVelocity(btVec);
+                            var zeroVec = new Ammo.btVector3(0, 0, 0);
+                            released.body.setLinearVelocity(zeroVec);
+                            released.body.setAngularVelocity(zeroVec);
+                            released.body.setActivationState(1); // ACTIVE
                             if(released.body.activate) released.body.activate();
-                            Ammo.destroy(btVec);
+                            Ammo.destroy(zeroVec);
                         }
-                    }, 50);
-
-                    this.grabbedEl = null;
+                    }, 100);
                 },
 
                 tick: function(time, delta) {
@@ -468,9 +510,9 @@
   </head>
   <body>
     <!-- Config Scene avec Physique Ammo (DEBUG DISABLED) -->
-    <a-scene
-      physics="driver: ammo; debug: false; gravity: -9.8"
-      renderer="antialias: false; colorManagement: true; sortObjects: true"
+    <a-scene physics="driver: ammo; debug: false; gravity: -9.8" 
+             renderer="colorManagement: true; physicallyCorrectLights: true; sortObjects: true"
+             enter-teleport-trigger
     >
       <!-- 2. ASSETS -->
       <a-assets>
@@ -619,6 +661,8 @@
         height="100"
         repeat="20 20"
         material="roughness: 1; metalness: 0"
+        class="clickable"
+        click-teleport
       >
       </a-plane>
 
@@ -780,7 +824,7 @@
                 <!-- Allow desktop cursor to hit UI AND Grabbable objects on PC -->
                 <a-entity cursor="rayOrigin: mouse" raycaster="objects: .clickable, .grabbable, [mixin*='grabbable']" grabber></a-entity>
             </a-camera>
-            <a-entity id="lhand" hand-controls="hand: left" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: [ammo-shape]; startEvents: teleportstart; endEvents: teleportend" visible="true" grabber raycaster="objects: .grabbable, .clickable, [mixin*='grabbable']; showLine: false"></a-entity>
+            <a-entity id="lhand" hand-controls="hand: left" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: [ammo-shape]; startEvents: teleportstart; endEvents: teleportend" visible="true"></a-entity>
             <a-entity id="rhand" hand-controls="hand: right" visible="true" grabber raycaster="objects: .grabbable, .clickable, [mixin*='grabbable']; showLine: false"></a-entity>
             <!-- Laser controls for pointer interaction with keys -->
             <a-entity laser-controls="hand: right" raycaster="objects: .clickable"></a-entity>
@@ -807,20 +851,7 @@
       // Végétation
       // ... (Rest of existing code)
 
-      // --- PC TELEPORT TEST ---
-      // Press 'ENTER' to start teleport ray, Release to teleport
-      document.addEventListener('keydown', function(event) {
-          if (event.code === 'Enter') {
-              var lHand = document.querySelector('#lhand');
-              lHand.emit('teleportstart');
-          }
-      });
-      document.addEventListener('keyup', function(event) {
-          if (event.code === 'Enter') {
-              var lHand = document.querySelector('#lhand');
-              lHand.emit('teleportend');
-          }
-      });
+
       function createVegetation() {
         var container = document.querySelector("#vegetation");
 
