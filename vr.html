@@ -220,15 +220,154 @@
 
         <!-- 6. JOUEUR (RIG CAMERA) -->
         <a-entity id="rig">
-            <a-camera id="camera" position="0 1.6 0" look-controls wasd-controls></a-camera>
+            <a-camera id="camera" position="0 1.6 0" look-controls wasd-controls>
+                <a-entity cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
+            </a-camera>
             <a-entity id="lhand" hand-controls="hand: left" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: [ammo-shape]" visible="true"></a-entity>
             <a-entity id="rhand" hand-controls="hand: right" visible="true"></a-entity>
+            <!-- Laser controls for pointer interaction with keys -->
+            <a-entity laser-controls="hand: right" raycaster="objects: .clickable"></a-entity>
+            <a-entity laser-controls="hand: left" raycaster="objects: .clickable"></a-entity>
+        </a-entity>
+        
+        <!-- Keyboard AZERTY (attaché au rig pour suivre le joueur) -->
+        <a-entity id="vr-keyboard-root" position="0 1.1 -1.5" rotation="0 0 0" scale="1 1 1">
+            <!-- Field display -->
+            <a-entity id="vr-input-field" geometry="primitive: plane; width: 1.6; height: 0.28" material="color: #021; opacity: 0.7; shader: flat" position="0 0.36 0.01">
+                <a-entity id="vr-input-text" text="value: ; align: center; color: #7FFFD4; width: 1.4; wrapCount: 30" position="0 0 0.02"></a-entity>
+            </a-entity>
+
+            <!-- Keyboard container (keys will be populated by script) -->
+            <a-entity id="vr-keyboard" position="0 0 0" rotation="0 0 0"></a-entity>
+
+            <!-- Small helper to indicate clickable area (visual neon border) -->
+            <a-entity geometry="primitive: ring; radiusInner: 0.82; radiusOuter: 0.86" material="color:#00ffd0; opacity:0.06; side: double" rotation="-90 0 0" position="0 0.02 0"></a-entity>
         </a-entity>
     
     </a-scene>
 
     <!-- Script de génération procédurale & Animation -->
     <script>
+        // --- VR Keyboard (AZERTY) ---
+        (function(){
+            var inputValue = '';
+            var shift = false;
+
+            function makeKey(label, w, h) {
+                var el = document.createElement('a-entity');
+                el.setAttribute('class', 'clickable');
+                // Use box geometry for a 3D key with some depth
+                var depth = 0.04;
+                el.setAttribute('geometry', 'primitive: box; width: ' + w + '; height: ' + h + '; depth: ' + depth);
+                el.setAttribute('material', 'color: #002b2b; shader: flat; emissive: #00ffd0; emissiveIntensity: 0.03; opacity: 0.98');
+                el.setAttribute('data-key', label);
+                // Keys face the camera (no rotation)
+                el.setAttribute('scale', '1 1 1');
+
+                var txt = document.createElement('a-entity');
+                var display = (label.length > 1 ? label : (label === 'space' ? '␣' : label.toUpperCase()));
+                txt.setAttribute('text', 'value: ' + display + '; align: center; color: #00ffd4; width: ' + (w * 4) + '; baseline: center');
+                // Place text slightly in front of key face
+                txt.setAttribute('position', '0 0 ' + (depth/2 + 0.01));
+                el.appendChild(txt);
+
+                // Interaction
+                el.addEventListener('click', function(evt){
+                    var k = this.getAttribute('data-key');
+                    pressKey(k, this);
+                });
+
+                return el;
+            }
+
+            function pressKey(k, el) {
+                // visual press
+                el.object3D.scale.set(0.95,0.95,0.95);
+                setTimeout(function(){ el.object3D.scale.set(1,1,1); }, 120);
+
+                if(k === 'backspace') {
+                    inputValue = inputValue.slice(0, -1);
+                } else if(k === 'space') {
+                    inputValue += ' ';
+                } else if(k === 'enter') {
+                    // action on enter: here we just log and clear
+                    console.log('VR Input Enter:', inputValue);
+                    inputValue = '';
+                } else if(k === 'shift') {
+                    shift = !shift;
+                    highlightShift(shift);
+                } else {
+                    var out = shift ? k.toUpperCase() : k;
+                    inputValue += out;
+                    if(shift) { shift = false; highlightShift(false); }
+                }
+                updateInputText();
+            }
+
+            function highlightShift(on) {
+                var keys = document.querySelectorAll('[data-key="shift"]');
+                keys.forEach(function(k){ k.setAttribute('material','color:' + (on? '#004d4d':'#002b2b')); });
+            }
+
+            function updateInputText() {
+                var t = document.querySelector('#vr-input-text');
+                if(t) t.setAttribute('text','value', inputValue);
+            }
+
+            function createKeyboard() {
+                var container = document.querySelector('#vr-keyboard');
+                if(!container) return;
+
+                // AZERTY rows
+                var rows = [
+                    ['a','z','e','r','t','y','u','i','o','p'],
+                    ['q','s','d','f','g','h','j','k','l','m'],
+                    ['w','x','c','v','b','n',',',';',':','?']
+                ];
+
+                var keyW = 0.14, keyH = 0.12, gap = 0.02;
+                rows.forEach(function(row, rowIndex){
+                    var cols = row.length;
+                    var rowWidth = cols * keyW + (cols - 1) * gap;
+                    var startX = -rowWidth/2 + keyW/2;
+                    // For 3D upright keys: y varies per row, z is small forward offset
+                    var baseY = 0.08; // top row Y
+                    var y = baseY - rowIndex * (keyH + gap);
+                    var z = 0.06;
+                    row.forEach(function(k, i){
+                        var x = startX + i * (keyW + gap);
+                        var key = makeKey(k, keyW, keyH);
+                        key.setAttribute('position', x + ' ' + y + ' ' + z);
+                        container.appendChild(key);
+                    });
+                });
+
+                // Special row: shift, space, backspace, enter (lower area)
+                var specialBaseY = 0.08 - 3 * (keyH + gap);
+                var zSpecial = 0.06;
+                var shift = makeKey('shift', 0.28, keyH);
+                shift.setAttribute('position', (-0.9) + ' ' + specialBaseY + ' ' + zSpecial);
+                container.appendChild(shift);
+
+                var back = makeKey('backspace', 0.28, keyH);
+                back.setAttribute('position', (0.9) + ' ' + specialBaseY + ' ' + zSpecial);
+                container.appendChild(back);
+
+                var enter = makeKey('enter', 0.28, keyH);
+                enter.setAttribute('position', (0.45) + ' ' + specialBaseY + ' ' + zSpecial);
+                container.appendChild(enter);
+
+                var space = makeKey('space', 1.0, keyH);
+                space.setAttribute('position', '0 ' + (specialBaseY - (keyH + 0.01)) + ' ' + zSpecial);
+                container.appendChild(space);
+
+                updateInputText();
+            }
+
+            // Init keyboard when scene ready
+            window.addEventListener('load', function(){ createKeyboard(); });
+        })();
+
         // Génération Pluie
         function createRain() {
             var scene = document.querySelector('a-scene');
@@ -348,10 +487,10 @@
         function animateGnous() {
             var gnous = [
                 document.querySelector('#gnou1'),
-                document.querySelector('#gnou2'),
-                document.querySelector('#gnou3'),
-                document.querySelector('#gnou4'),
-                document.querySelector('#gnou5')
+                //document.querySelector('#gnou2'),
+                //document.querySelector('#gnou3'),
+                //document.querySelector('#gnou4'),
+                //document.querySelector('#gnou5')
             ];
 
             var t = 0;
