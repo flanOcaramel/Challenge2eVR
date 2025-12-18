@@ -402,6 +402,7 @@
                     this.grabbedBy = byEl;
                     this.el.classList.add('is-grabbed');
                     this.el.emit('grab-start', { by: byEl });
+                    console.log('[grabbable] grabbed by', byEl && byEl.id ? byEl.id : byEl);
                     return true;
                 },
                 release: function() {
@@ -409,37 +410,83 @@
                     this.grabbedBy = null;
                     this.el.classList.remove('is-grabbed');
                     this.el.emit('grab-end', { by: prev });
+                    console.log('[grabbable] released by', prev && prev.id ? prev.id : prev);
+                }
+            });
+
+            // Highlightable: toggle emissive highlight on demand via events
+            AFRAME.registerComponent('highlightable', {
+                schema: { color: { type: 'color', default: '#00ffd0' }, intensity: { type: 'number', default: 0.6 } },
+                init: function() {
+                    this._originals = [];
+                    this._highlighted = false;
+                    this.onHighlightOn = this.onHighlightOn.bind(this);
+                    this.onHighlightOff = this.onHighlightOff.bind(this);
+                    this.el.addEventListener('highlight-on', this.onHighlightOn);
+                    this.el.addEventListener('highlight-off', this.onHighlightOff);
+                },
+                remove: function() {
+                    this.el.removeEventListener('highlight-on', this.onHighlightOn);
+                    this.el.removeEventListener('highlight-off', this.onHighlightOff);
+                    if (this._highlighted) this._restore();
+                },
+                onHighlightOn: function() { this._apply(); },
+                onHighlightOff: function() { this._restore(); },
+                _apply: function() {
+                    if (this._highlighted) return;
+                    var color = new THREE.Color(this.data.color);
+                    this.el.object3D.traverse(function(node){
+                        if (node.isMesh && node.material) {
+                            // store original emissive & intensity
+                            var mat = node.material;
+                            this._originals.push({ node: node, emissive: mat.emissive ? mat.emissive.clone() : new THREE.Color(0x000000), emissiveIntensity: mat.emissiveIntensity || 0 });
+                            if (mat.emissive) mat.emissive.copy(color); else mat.emissive = color.clone();
+                            mat.emissiveIntensity = this.data.intensity;
+                            mat.needsUpdate = true;
+                        }
+                    }.bind(this));
+                    this._highlighted = true;
+                },
+                _restore: function() {
+                    if (!this._highlighted) return;
+                    this._originals.forEach(function(orig){
+                        if (orig.node && orig.node.material) {
+                            var mat = orig.node.material;
+                            if (orig.emissive) mat.emissive.copy(orig.emissive);
+                            mat.emissiveIntensity = orig.emissiveIntensity || 0;
+                            mat.needsUpdate = true;
+                        }
+                    });
+                    this._originals = [];
+                    this._highlighted = false;
                 }
             });
 
             AFRAME.registerComponent('grabber', {
                 schema: {},
                 init: function() {
-                    // internal state
                     this.grabbedEl = null;
                     this.offsetMatrix = new THREE.Matrix4();
                     this.invHandMatrix = new THREE.Matrix4();
                     this.tempMatrix = new THREE.Matrix4();
+                    // store original physics attributes for grabbed entities
+                    this._grabbedOriginals = new WeakMap();
 
-                    // bind handlers
                     this.onDown = this.onDown.bind(this);
                     this.onUp = this.onUp.bind(this);
                     this.onCursorClick = this.onCursorClick.bind(this);
 
-                    // VR controller events (trigger/grip)
                     this.el.addEventListener('triggerdown', this.onDown);
                     this.el.addEventListener('gripdown', this.onDown);
                     this.el.addEventListener('triggerup', this.onUp);
                     this.el.addEventListener('gripup', this.onUp);
 
-                    // Desktop fallback: listen to cursor click from camera cursor (if present)
                     var scene = this.el.sceneEl;
                     this._cursor = scene && scene.querySelector('[cursor]');
                     if (this._cursor) {
                         this._cursor.addEventListener('click', this.onCursorClick);
                     }
 
-                    // Also listen to mouse up to release if using native mouse events
                     window.addEventListener('mouseup', this.onUp);
                 },
 
@@ -452,51 +499,56 @@
                     window.removeEventListener('mouseup', this.onUp);
                 },
 
-                // When grab button pressed (VR controllers)
                 onDown: function(evt) {
-                    if (this.grabbedEl) return; // already holding something
+                    console.log('[grabber] onDown', this.el.id || this.el);
+                    if (this.grabbedEl) return;
 
-                    // If event provides an intersectedEl (some controllers provide), use it
                     if (evt && evt.detail && evt.detail.intersectedEl) {
-                        var cand = evt.detail.intersectedEl;
-                        this._tryGrabCandidate(cand);
+                        console.log('[grabber] event provided intersectedEl', evt.detail.intersectedEl.id || evt.detail.intersectedEl);
+                        this._tryGrabCandidate(evt.detail.intersectedEl);
                         return;
                     }
 
-                    // Query raycaster intersections (works for raycaster on this.el)
                     var rc = this.el.components && this.el.components.raycaster;
-                    var intersections = rc && rc.intersections ? rc.intersections : [];
+                    var intersections = [];
+                    try {
+                        intersections = rc && rc.intersections ? rc.intersections : [];
+                    } catch(e) {
+                        console.warn('[grabber] raycaster read failed', e);
+                    }
 
-                    if (!intersections.length) return;
+                    if (!intersections || !intersections.length) return;
 
-                    // find first intersected entity that is grabbable and not grabbed
-                    var found = null;
                     for (var i = 0; i < intersections.length; i++) {
                         var obj = intersections[i].object;
                         var candidate = obj && obj.el ? obj.el : null;
                         if (!candidate) continue;
+                        console.log('[grabber] intersection candidate', candidate.id || candidate);
                         this._tryGrabCandidate(candidate);
                         if (this.grabbedEl) return;
                     }
                 },
 
-                // Cursor click handler (desktop)
                 onCursorClick: function(evt) {
+                    console.log('[grabber] onCursorClick');
                     if (this.grabbedEl) return;
                     var cand = evt && evt.detail && evt.detail.intersectedEl ? evt.detail.intersectedEl : null;
-                    if (cand) this._tryGrabCandidate(cand);
+                    if (cand) {
+                        console.log('[grabber] cursor intersected', cand.id || cand);
+                        this._tryGrabCandidate(cand);
+                    }
                 },
 
                 _tryGrabCandidate: function(candidate) {
-                    // climb up to entity with grabbable component if needed
                     var el = candidate;
-                    // climb parent chain up to scene if candidate is a mesh
                     while (el && el.tagName && el.tagName.toLowerCase() !== 'a-scene') {
                         if (el.components && el.components.grabbable) break;
                         if (el.classList && el.classList.contains('grabbable')) break;
                         el = el.parentEl;
                     }
                     if (!el || el.tagName.toLowerCase() === 'a-scene') return;
+
+                    console.log('[grabber] resolved candidate to', el.id || el);
 
                     if (el.components && el.components.grabbable) {
                         if (!el.components.grabbable.isGrabbed()) {
@@ -508,46 +560,62 @@
                     }
                 },
 
-                // Grab implementation: compute offset and start following
                 _grab: function(targetEl) {
                     if (!targetEl) return;
-                    // mark grabbed on target's component
+                    console.log('[grabber] grabbing', targetEl.id || targetEl);
                     if (targetEl.components && targetEl.components.grabbable) {
                         var ok = targetEl.components.grabbable.grab(this.el);
-                        if (!ok) return; // someone else grabbed it
+                        if (!ok) { console.log('[grabber] grab denied by component'); return; }
                     } else {
                         targetEl.setAttribute('grabbable', '');
                         targetEl.components.grabbable.grab(this.el);
                     }
 
+                    // If object has physics, store original ammo-body and set to kinematic
+                    try {
+                        if (targetEl.hasAttribute && targetEl.hasAttribute('ammo-body')) {
+                            var orig = targetEl.getAttribute('ammo-body');
+                            this._grabbedOriginals.set(targetEl, { 'ammo-body': orig });
+                            targetEl.setAttribute('ammo-body', 'type: kinematic; mass: 0');
+                            console.log('[grabber] set ammo-body to kinematic for', targetEl.id || targetEl);
+                        }
+                    } catch(e) { console.warn('[grabber] error toggling ammo-body', e); }
+
                     // compute offset matrix: inv(handWorld) * objectWorld
-                    this.invHandMatrix.copy(this.el.object3D.matrixWorld).invert();
-                    this.offsetMatrix.copy(this.invHandMatrix).multiply(targetEl.object3D.matrixWorld);
+                    try {
+                        this.invHandMatrix.copy(this.el.object3D.matrixWorld).invert();
+                        this.offsetMatrix.copy(this.invHandMatrix).multiply(targetEl.object3D.matrixWorld);
+                    } catch(e) {
+                        console.warn('[grabber] matrix invert/multiply failed', e);
+                        this.offsetMatrix.identity();
+                    }
 
-                    // keep reference
                     this.grabbedEl = targetEl;
-
-                    // optionally make smaller collision or visual change
                     this.grabbedEl.emit('grabbed', { by: this.el });
                 },
 
-                // When release button
                 onUp: function(evt) {
+                    console.log('[grabber] onUp');
                     if (!this.grabbedEl) return;
 
                     var released = this.grabbedEl;
-
-                    // compute final world matrix (already updated in tick)
                     var worldMat = new THREE.Matrix4().copy(released.object3D.matrixWorld);
 
-                    // release component
                     if (released.components && released.components.grabbable) released.components.grabbable.release();
 
-                    // reparent to scene (so it stays where released)
+                    // restore original ammo-body if we modified it
+                    try {
+                        var saved = this._grabbedOriginals.get(released);
+                        if (saved && saved['ammo-body'] !== undefined) {
+                            released.setAttribute('ammo-body', saved['ammo-body']);
+                            console.log('[grabber] restored ammo-body for', released.id || released);
+                            this._grabbedOriginals.delete(released);
+                        }
+                    } catch(e) { console.warn('[grabber] restore ammo-body failed', e); }
+
                     var sceneEl = this.el.sceneEl;
                     sceneEl.appendChild(released);
 
-                    // apply world transform as local after reparent
                     released.object3D.matrix.copy(worldMat);
                     var pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scale = new THREE.Vector3();
                     released.object3D.matrix.decompose(pos, quat, scale);
@@ -557,20 +625,34 @@
                     released.object3D.updateMatrixWorld(true);
 
                     released.emit('released', { by: this.el });
+                    console.log('[grabber] released', released.id || released);
                     this.grabbedEl = null;
                 },
 
                 tick: function() {
                     if (!this.grabbedEl) return;
 
-                    // compute new world matrix = handWorld * offsetMatrix
                     this.tempMatrix.copy(this.el.object3D.matrixWorld).multiply(this.offsetMatrix);
                     var pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scale = new THREE.Vector3();
                     this.tempMatrix.decompose(pos, quat, scale);
 
-                    // apply to grabbed entity
+                    // Validate computations before applying
+                    if (!isFinite(pos.x) || !isFinite(pos.y) || !isFinite(pos.z)) {
+                        console.warn('[grabber] invalid computed pos, skipping apply', pos);
+                        return;
+                    }
+                    if (!isFinite(quat.x) || !isFinite(quat.y) || !isFinite(quat.z) || !isFinite(quat.w)) {
+                        console.warn('[grabber] invalid computed quat, skipping apply', quat);
+                        return;
+                    }
+                    if (!isFinite(scale.x) || !isFinite(scale.y) || !isFinite(scale.z)) {
+                        console.warn('[grabber] invalid computed scale, using default', scale);
+                        scale.set(1,1,1);
+                    }
+
                     this.grabbedEl.object3D.position.copy(pos);
                     this.grabbedEl.object3D.quaternion.copy(quat);
+                    if (scale.x === 0 || scale.y === 0 || scale.z === 0) scale.set(1,1,1);
                     this.grabbedEl.object3D.scale.copy(scale);
                     this.grabbedEl.object3D.updateMatrixWorld(true);
                 }
