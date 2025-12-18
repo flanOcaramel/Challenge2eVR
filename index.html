@@ -1,392 +1,126 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html>
 <head>
-    <meta charset="utf-8">
-    <title>La Prairie Pluvieuse - VR</title>
-    <meta name="description" content="Environnement VR immersif avec physique">
-    
-    <!-- 1. IMPORT A-FRAME & LIBRARIES -->
-    <!-- A-Frame Core -->
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    
-    <!-- A-Frame Extras (Animation, Controls, etc.) -->
-    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.0.0/dist/aframe-extras.min.js"></script>
-
-    <!-- Physics System (Ammo Driver) -->
-    <!-- Note: Ammo.js wasm loader config usually handled by aframe-physics-system, but explicit load can be safer -->
-    <script src="https://cdn.jsdelivr.net/gh/MozillaReality/ammo.js@8bbc0ea/builds/ammo.wasm.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-physics-system@v4.2.2/dist/aframe-physics-system.min.js"></script>
-    
-    <!-- Teleport Controls -->
-    <script src="https://rawgit.com/fernsroth/aframe-teleport-controls/master/dist/aframe-teleport-controls.min.js"></script>
-
-    <!-- Custom User Scripts -->
-    <!-- Custom User Scripts -->
-    <script src="./assets/js/christmas-utils.js"></script>
-    <!-- Script introuvable : <script src="./research/physics-ammo/move-objects-ph3.js"></script> -->
-
-    <script>
-        // Configuration simple pour la pluie (sera lancée plus bas)
-        AFRAME.registerComponent('rain-drop', {
-            init: function() {
-                this.reset();
-            },
-            tick: function() {
-                this.el.object3D.position.y -= 0.1;
-                if (this.el.object3D.position.y < 0) {
-                    this.reset();
-                }
-            },
-            reset: function() {
-                // Position aléatoire autour du joueur (zone 20x20)
-                var x = (Math.random() - 0.5) * 20;
-                var z = (Math.random() - 0.5) * 20;
-                var y = 10 + Math.random() * 5;
-                this.el.object3D.position.set(x, y, z);
-            }
-        });
-    </script>
+    <title>Challenge2e VR Carousel</title>
+    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+    <script src="https://unpkg.com/aframe-super-hands@3.0.0/dist/super-hands.min.js"></script>
+    <script src="https://unpkg.com/aframe-physics-system@4.0.0/dist/aframe-physics-system.min.js"></script>
 </head>
 <body>
-    <!-- Config Scene avec Physique Ammo (Sans fog pour ciel net) -->
-    <a-scene 
-        physics="driver: ammo; debug: false; gravity: -9.8"
-        renderer="antialias: false; colorManagement: true; sortObjects: true">
+    <a-scene physics="gravity: 0">
+        <a-camera position="0 1.6 0">
+            <a-cursor></a-cursor>
+        </a-camera>
 
-        <!-- 2. ASSETS -->
-        <a-assets>
-            <!-- Texture Sol Réaliste (CDN Three.js) -->
-            <img id="grassTexture" src="https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/terrain/grasslight-big.jpg">
-            
-            <!-- Modèles 3D -->
-            <a-asset-item id="grassModel" src="./assets/models/Grass.glb"></a-asset-item>
-            <a-asset-item id="barnModel" src="./assets/models/wooden_barn.glb"></a-asset-item>
-            <a-asset-item id="fenceModel" src="./assets/models/fence.glb"></a-asset-item>
-            <a-asset-item id="wildebeestModel" src="./assets/models/wildebeest.glb"></a-asset-item>
-            <a-asset-item id="treeModel" src="./assets/models/Tree.glb"></a-asset-item>
-            <a-asset-item id="bushModel" src="./assets/models/bush.glb"></a-asset-item>
-            <a-asset-item id="stickModel" src="./assets/models/Stick.glb"></a-asset-item>
-            <a-asset-item id="crateModel" src="./assets/models/Crate.glb"></a-asset-item>
-            <a-asset-item id="hatModel" src="./assets/models/hat.glb"></a-asset-item>
-            <a-asset-item id="sunModel" src="./assets/models/Sun.glb"></a-asset-item>
-            <a-asset-item id="chatModel" src="./assets/models/chat.glb"></a-asset-item>
-            <a-asset-item id="swingModel" src="./assets/models/balancoire.glb"></a-asset-item>
-
-            <!-- Mixins Physiques & Interactions -->
-            <!-- Objet attrapable standard -->
-            <a-mixin id="grabbable" 
-                movement="type: grabbable; stickiness: stickable"
-                ammo-shape="type: hull"
-                ammo-body="type: dynamic; mass: 1">
-            </a-mixin>
-
-            <a-mixin id="grassMixin" gltf-model="#grassModel" scale="0.1 0.1 0.1"></a-mixin>
-
-            <a-mixin id="stickMixin" 
-                gltf-model="#stickModel" 
-                scale="1 1 1"
-                mixin="grabbable">
-            </a-mixin>
-
-            <a-mixin id="hatMixin"
-                gltf-model="#hatModel"
-                scale="1 1 1"
-                mixin="grabbable">
-            </a-mixin>
-
-            <!-- Mixins Christmas (Image User) -->
-            <a-mixin id="coal" material="color:black" 
-                     geometry="primitive:sphere; segments-height:7; segments-width:13; radius:0.04"
-                     movement="type:grabbable; stickiness:stickable"
-                     ammo-shape="type:sphere; fit:manual; sphereRadius:0.04"
-                     ammo-body="type:dynamic; mass:0.1">
-            </a-mixin>
-            <a-mixin id="branch" material="color:#5C4033" 
-                     geometry="primitive:branch" scale="0.2 0.2 0.2"
-                     movement="type:grabbable; stickiness:stickable"
-                     ammo-shape="type:hull"
-                     ammo-body="type:dynamic; mass:0.1">
-            </a-mixin>
-
-            <!-- Mixin Arbre (Décor) -->
-            <a-mixin id="treeMixin"
-                gltf-model="#treeModel"
-                scale="3 3 3"
-                ammo-body="type: static" 
-                ammo-shape="type: cylinder">
-            </a-mixin>
-
-            <!-- Mixin Bush (Petit buisson) -->
-            <a-mixin id="bushMixin"
-                gltf-model="#bushModel"
-                scale="0.02 0.02 0.02" 
-                ammo-body="type: static" 
-                ammo-shape="type: box">
-            </a-mixin>
-        </a-assets>
-
-        <!-- 3. ENVIRONNEMENT -->
-        <!-- Ciel Ensoleillé (Bleu pur) -->
-        <a-sky color="#87CEEB"></a-sky>
-
-        <!-- Soleil -->
-        <a-entity gltf-model="#sunModel" position="-20 50 -30" scale="5 5 5"></a-entity>
-        
-        <!-- Lumière -->
-        <a-entity light="type: ambient; color: #FFF; intensity: 0.7"></a-entity>
-        <a-entity light="type: directional; color: #FFF; intensity: 1; castShadow: false" position="-1 1 0.5"></a-entity>
-
-        <a-plane 
-            src="#grassTexture"
-            rotation="-90 0 0" 
-            width="100" 
-            height="100" 
-            repeat="20 20"
-            material="roughness: 1; metalness: 0"
-            ammo-body="type: static" 
-            ammo-shape="type: box">
-        </a-plane>
-
-        <!-- 4. ÉLÉMENTS SCÉNIQUES -->
-        <!-- Hangar -->
-        <a-entity gltf-model="#barnModel" position="-10 0 -15" scale="2 2 2" 
-            ammo-body="type: static" 
-            ammo-shape="type: box; fit: manual; halfExtents: 5 4 5; offset: 0 4 0">
+        <a-entity id="carousel" position="0 1.6 -3" rotation="0 0 0">
+            <!-- Users will be added here dynamically -->
         </a-entity>
 
-        <!-- Balançoire (Devant la maison) -->
-        <!-- Réduite de 15% addtionnelle (0.02 * 0.85 = 0.017) -->
-        <a-entity gltf-model="#swingModel" position="-10 0 -5" rotation="0 180 0" scale="0.017 0.017 0.017"
-             ammo-body="type: static" ammo-shape="type: hull"></a-entity>
+        <a-plane position="0 0 -4" rotation="-90 0 0" width="10" height="10" color="#7BC8A4"></a-plane>
 
-        <!-- Enclos (Fence) -->
-        <a-entity position="10 0 -15" id="enclosArea">
-            <!-- Façade -->
-            <a-entity gltf-model="#fenceModel" position="0 0 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
-            <a-entity gltf-model="#fenceModel" position="4 0 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
-            <a-entity gltf-model="#fenceModel" position="8 0 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
-            <!-- Arrière -->
-            <a-entity gltf-model="#fenceModel" position="0 0 8" rotation="0 180 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
-            <a-entity gltf-model="#fenceModel" position="4 0 8" rotation="0 180 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
-            <a-entity gltf-model="#fenceModel" position="8 0 8" rotation="0 180 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
-            <!-- Côtés -->
-            <a-entity gltf-model="#fenceModel" position="-2 0 2" rotation="0 90 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
-            <a-entity gltf-model="#fenceModel" position="-2 0 6" rotation="0 90 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
-            <a-entity gltf-model="#fenceModel" position="10 0 2" rotation="0 90 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
-            <a-entity gltf-model="#fenceModel" position="10 0 6" rotation="0 90 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"></a-entity>
-            
-            <!-- 5 Gnous (Wildebeests) -->
-            <a-entity id="gnou1" gltf-model="#wildebeestModel" position="4 0 4" scale="0.7 0.7 0.7" animation-mixer="clip: *walk*; loop: repeat; timeScale: 1.0"></a-entity>
-            <a-entity id="gnou2" gltf-model="#wildebeestModel" position="5 0 5" scale="0.7 0.7 0.7" animation-mixer="clip: *walk*; loop: repeat; timeScale: 0.9"></a-entity>
-            <a-entity id="gnou3" gltf-model="#wildebeestModel" position="3 0 5" scale="0.7 0.7 0.7" animation-mixer="clip: *walk*; loop: repeat; timeScale: 1.1"></a-entity>
-            <a-entity id="gnou4" gltf-model="#wildebeestModel" position="5 0 3" scale="0.7 0.7 0.7" animation-mixer="clip: *walk*; loop: repeat; timeScale: 1.05"></a-entity>
-            <a-entity id="gnou5" gltf-model="#wildebeestModel" position="3 0 3" scale="0.7 0.7 0.7" animation-mixer="clip: *walk*; loop: repeat; timeScale: 0.95"></a-entity>
-            <a-entity id="gnou1" gltf-model="#wildebeestModel" position="4 0 4" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 1.0"></a-entity>
-            <a-entity id="gnou2" gltf-model="#wildebeestModel" position="5 0 5" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 0.9"></a-entity>
-            <a-entity id="gnou3" gltf-model="#wildebeestModel" position="3 0 5" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 1.1"></a-entity>
-            <a-entity id="gnou4" gltf-model="#wildebeestModel" position="5 0 3" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 1.05"></a-entity>
-            <a-entity id="gnou5" gltf-model="#wildebeestModel" position="3 0 3" scale="0.7 0.7 0.7" animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 0.95"></a-entity>
-        </a-entity>
 
-        <!-- Végétation & Loot -->
-        <a-entity position="0 0 0" id="vegetation"></a-entity>
-
-        <!-- LE CHAT -->
-        <!-- Scale 0.05. Rehaussé Y=0.15 pour ne pas être enterré -->
-        <a-entity gltf-model="#chatModel" position="-12 0.50 -11" scale="0.02 0.02 0.02" rotation="0 45 0" 
-                  ammo-body="type: static" ammo-shape="type: hull"></a-entity>
-
-        <!-- 5. LA CAISSE SPÉCIALE INTERACTIVE -->
-        <a-entity position="-6 0 -11"> 
-            <!-- Caisse en bois -->
-            <a-entity gltf-model="#crateModel" 
-                id="mainCrate"
-                scale="1 1 1"
-                ammo-body="type: static" 
-                ammo-shape="type: box"
-                movement="type: static; stickiness: sticky" 
-                position="0 0 0">
-            </a-entity>
-
-            <!-- Objets posés SUR la caisse -->
-            <!-- Chapeau : Taille réduite (0.2) et posé dessus -->
-            <a-entity mixin="hatMixin" position="0 1.0 0" scale="0.2 0.2 0.2"></a-entity>
-            <!-- Baton -->
-            <a-entity mixin="stickMixin" position="0.5 1.0 0.2" rotation="0 90 0"></a-entity>
-            <!-- 3. Coal & Branch (Nouveaux) -->
-            <a-entity mixin="coal" position="-0.3 1.05 0.2"></a-entity>
-            <a-entity mixin="branch" position="0.3 1.02 -0.2" rotation="90 0 0"></a-entity>
-        </a-entity>
-
-        <!-- 6. JOUEUR (RIG CAMERA) -->
-        <a-entity id="rig">
-            <a-camera id="camera" position="0 1.6 0" look-controls wasd-controls></a-camera>
-            <a-entity id="lhand" hand-controls="hand: left" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: [ammo-shape]" visible="true"></a-entity>
-            <a-entity id="rhand" hand-controls="hand: right" visible="true"></a-entity>
-        </a-entity>
-    
     </a-scene>
 
-    <!-- Script de génération procédurale & Animation -->
+    <div id="password-overlay" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border: 1px solid black;">
+        <p>Enter password for <span id="user-name"></span>:</p>
+        <input type="password" id="password-input">
+        <button id="submit-btn">Submit</button>
+        <button id="cancel-btn">Cancel</button>
+    </div>
+
     <script>
-        // Génération Pluie
-        function createRain() {
-            var scene = document.querySelector('a-scene');
-            var rainCount = 200; // OPTIMISATION : Grosses économies CPU/GPU
-            for(var i=0; i<rainCount; i++) {
-                var drop = document.createElement('a-entity');
-                drop.setAttribute('geometry', 'primitive: box; height: 0.1; width: 0.01; depth: 0.01');
-                drop.setAttribute('material', 'color: #AACCFF; opacity: 0.6; transparent: true');
-                drop.setAttribute('rain-drop', '');
-                scene.appendChild(drop);
-            }
+        let users = [];
+        let selectedUser = null;
+
+        // Fetch users from API
+        fetch('http://localhost/Challenge2e/public/api.php')
+            .then(response => response.json())
+            .then(data => {
+                users = data;
+                createCarousel();
+            });
+
+        function createCarousel() {
+            const carousel = document.getElementById('carousel');
+            const radius = 3;
+            const angleStep = (2 * Math.PI) / users.length;
+
+            users.forEach((user, index) => {
+                const angle = index * angleStep;
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius;
+
+                const userEntity = document.createElement('a-entity');
+                userEntity.setAttribute('position', `${x} 0 ${z}`);
+                userEntity.setAttribute('look-at', '0 1.6 0');
+
+                // Avatar 3D
+                const avatar = document.createElement('a-gltf-model');
+                avatar.setAttribute('src', `assets/models/${user.modelAvatar}`);
+                avatar.setAttribute('scale', '0.5 0.5 0.5');
+                userEntity.appendChild(avatar);
+
+                // Name text
+                const nameText = document.createElement('a-text');
+                nameText.setAttribute('value', user.username);
+                nameText.setAttribute('position', '0 1 0');
+                nameText.setAttribute('align', 'center');
+                userEntity.appendChild(nameText);
+
+                // Make clickable
+                userEntity.setAttribute('class', 'clickable');
+                userEntity.addEventListener('click', () => selectUser(user));
+
+                carousel.appendChild(userEntity);
+            });
         }
-        
-        // Végétation (Arbres Decor & Bush Sol)
-        function createVegetation() {
-            var container = document.querySelector('#vegetation');
 
-            // 1. ARBRES (Décor Naturel autour)
-            // On veut une disposition aléatoire mais qui laisse le centre (Maison/Enclos) dégagé.
-            // Centre approximatif de la zone de vie : x=0, z=-10
-            var treeCount = 32;
-            var trees = [];
-            
-            for(var i=0; i<treeCount; i++) {
-                var valid = false, attempts = 0;
-                var x, z;
-
-                while(!valid && attempts < 50) {
-                    // Zone large de 80x80
-                    x = (Math.random() - 0.5) * 80;
-                    z = (Math.random() - 0.5) * 80; // Centré autour de 0,0
-
-                    // Calcul distance au centre de la zone de vie (0, -10)
-                    var dist = Math.sqrt((x - 0)**2 + (z - -10)**2);
-
-                    // REGLE : On veut les arbres LOIN du centre (> 25m) et pas trop proches les uns des autres
-                    if(dist > 25) { 
-                        valid = true;
-                        // Check anti-collision entre arbres
-                        for(var t=0; t<trees.length; t++) {
-                            if(Math.hypot(x-trees[t].x, z-trees[t].z) < 5) { valid = false; break; }
-                        }
-                    }
-                    attempts++;
-                }
-
-                if(valid) {
-                    trees.push({x:x, z:z});
-                    var tree = document.createElement('a-entity');
-                    tree.setAttribute('mixin', 'treeMixin');
-                    // Scale augmenté ENCORE de 30% (Total: 1.69)
-                    var s = (1.0 + Math.random() * 1.5) * 3; 
-                    // CORRECTION: position Y levée selon le scale (approx pivot centré)
-                    tree.setAttribute('position', {x: x, y: s * 1, z: z});
-                    tree.setAttribute('scale', {x: s, y: s, z: s});
-                    tree.setAttribute('rotation', {x: 0, y: Math.random()*360, z: 0});
-                    container.appendChild(tree);
-                }
-            }
-
-            // 2. BUSHES (Buissons au sol aléatoires)
-            // Ils peuvent être un peu plus proches, pour habiller le sol
-            var bushCount = 80; // OPTIMISATION
-            var isForbidden = function(x, z) {
-                // Zone stricte maison/enclos pour ne pas clipper dedans
-                // (x: -12 à 20, z: -20 à -5)
-                return (x > -12 && x < 20 && z > -20 && z < -5);
-            };
-
-            for(var k=0; k<bushCount; k++) {
-                var x = (Math.random() - 0.5) * 70;
-                var z = (Math.random() - 0.5) * 70;
-                
-                if(!isForbidden(x,z)) {
-                   var bush = document.createElement('a-entity');
-                   bush.setAttribute('mixin', 'bushMixin');
-                   bush.setAttribute('position', {x: x, y: 0, z: z});
-                   // Scale augmenté car 0.02 était invisible. 
-                   // On tente 0.5 à 0.8
-                   var s = 0.5 + Math.random() * 0.5; 
-                   bush.setAttribute('scale', {x: s, y: s, z: s});
-                   bush.setAttribute('rotation', {x: 0, y: Math.random()*360, z: 0});
-                   container.appendChild(bush);
-                }
-            }
-
-            // 3. Herbe & Batons
-            var grassCount = 150; // OPTIMISATION
-            for(var j=0; j<grassCount; j++) {
-                var angleG = Math.random() * Math.PI * 2;
-                var radiusG = 2 + Math.random() * 45; 
-                var xG = Math.cos(angleG) * radiusG;
-                var zG = Math.sin(angleG) * radiusG;
-                var grass = document.createElement('a-entity');
-                grass.setAttribute('mixin', 'grassMixin');
-                grass.setAttribute('position', {x: xG, y: 0, z: zG});
-                grass.setAttribute('rotation', {x: 0, y: Math.random()*360, z: 0});
-                container.appendChild(grass);
-            }
-
-             // Batons (Loot)
-             var stickCount = 10;
-            for(var l=0; l<stickCount; l++) {
-                var x = (Math.random() - 0.5) * 60;
-                var z = (Math.random() - 0.5) * 60;
-                if(!isForbidden(x,z)) {
-                    var stick = document.createElement('a-entity');
-                    stick.setAttribute('mixin', 'stickMixin');
-                    stick.setAttribute('position', {x: x, y: 0.1, z: z}); // Pose au sol
-                    stick.setAttribute('rotation', {x: 90, y: Math.random()*360, z: 0});
-                    container.appendChild(stick);
-                }
+        function selectUser(user) {
+            selectedUser = user;
+            if (user.nameWorld !== 'Plaine') {
+                window.location.href = user.urlWorld;
+            } else {
+                showPasswordPrompt();
             }
         }
 
-        // Animation Gnous (5)
-        function animateGnous() {
-            var gnous = [
-                document.querySelector('#gnou1'),
-                document.querySelector('#gnou2'),
-                document.querySelector('#gnou3'),
-                document.querySelector('#gnou4'),
-                document.querySelector('#gnou5')
-            ];
-
-            var t = 0;
-            setInterval(function() {
-                t += 0.02;
-                gnous.forEach(function(g, index) {
-                    if(g && g.object3D) {
-                        // Varie Rayon et Phase
-                        var offset = index * (Math.PI * 2 / 5);
-                        var r = 2.5 + (index % 2) * 1; 
-                        
-                        var x = 4 + Math.cos(t * 0.5 + offset) * r;
-                        var z = 4 + Math.sin(t * 0.5 + offset) * r;
-                        
-                        g.object3D.position.set(x, 0, z);
-                        // Orientation: Regarder vers l'avant de la marche
-                        // Tangente au cercle
-                        var angle = t * 0.5 + offset;
-                        // En A-Frame Rotation Y: 0 = -Z, 90 = -X...
-                        // Angle maths: 0 = +X.
-                        // Pour regarder "devant" sur le cercle trigonométrique (sens anti-horaire):
-                        // Rotation = -Angle + PI (ou similaire).
-                        // On ajuste expérimentalement si "à l'envers".
-                        // Essayons Rotation Y = -Angle
-                        g.object3D.rotation.y = -angle;
-                    }
-                });
-            }, 50);
+        function showPasswordPrompt() {
+            document.getElementById('user-name').textContent = selectedUser.username;
+            document.getElementById('password-overlay').style.display = 'block';
         }
 
-        // Lancement au chargement
-        window.addEventListener('load', function () {
-            createRain();
-            createVegetation();
-            animateGnous(); 
+        document.getElementById('submit-btn').addEventListener('click', () => {
+            const password = document.getElementById('password-input').value;
+            fetch('http://localhost/Challenge2e/public/login.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: selectedUser.username, password: password })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.href = 'vr.html';
+                } else {
+                    alert('Incorrect password');
+                }
+            });
+        });
+
+        document.getElementById('cancel-btn').addEventListener('click', () => {
+            document.getElementById('password-overlay').style.display = 'none';
+            document.getElementById('password-input').value = '';
+        });
+
+        // For carousel rotation (simplified, not grab yet)
+        document.addEventListener('keydown', (e) => {
+            const carousel = document.getElementById('carousel');
+            let rotation = carousel.getAttribute('rotation');
+            if (e.key === 'ArrowLeft') {
+                rotation.y += 10;
+            } else if (e.key === 'ArrowRight') {
+                rotation.y -= 10;
+            }
+            carousel.setAttribute('rotation', rotation);
         });
     </script>
 </body>
