@@ -26,7 +26,7 @@
     <!-- Custom User Scripts -->
     <!-- Custom User Scripts -->
     <script src="./assets/js/christmas-utils.js"></script>
-    <script src="./assets/js/move-objects.js"></script>
+    <script src="./assets/js/christmas-utils.js"></script>
     <!-- Script introuvable : <script src="./research/physics-ammo/move-objects-ph3.js"></script> -->
 
     <script>
@@ -49,10 +49,100 @@
           this.el.object3D.position.set(x, y, z);
         },
       });
+
+      // FIX PHYSICS: Enable CCD to prevent tunneling
+      AFRAME.registerComponent("fix-physics", {
+        init: function () {
+          this.el.addEventListener("body-loaded", (e) => {
+            const body = e.detail.body;
+            if (body) {
+              body.setCcdMotionThreshold(1e-7);
+              body.setCcdSweptSphereRadius(0.02);
+            }
+          });
+        },
+      });
+
+      // SLEEPY: Force object to sleep until touched/grabbed
+      // This prevents them from falling through the floor on load
+      AFRAME.registerComponent("sleepy", {
+        init: function () {
+          this.el.addEventListener("body-loaded", (e) => {
+            const body = e.detail.body;
+            if (body) {
+              // 2 = ISLAND_SLEEPING (Ammo.js)
+              body.setActivationState(2);
+            }
+          });
+        },
+      });
+
+      // AI WILDEBEEST
+      AFRAME.registerComponent("wildebeest-ai", {
+        init: function () {
+            this.direction = new THREE.Vector3(0, 0, 1);
+            this.speed = 0.02;
+            // Enclos Local Coordinates Approx: X[0..8], Z[0..8]
+            // We assume the entity is child of enclosArea (10,0,-15)
+            // So world coords: X[10..18], Z[-15..-7]
+            this.turnTimer = 0;
+        },
+        tick: function () {
+            // Move forward (Negative Z is forward in WebGL/A-Frame)
+            this.el.object3D.translateZ(-this.speed);
+
+            this.turnTimer++;
+            
+            // Random turn every now and then
+            if (this.turnTimer > 200 + Math.random() * 500) {
+                this.turn();
+            }
+
+            // Boundary Check (Local to parent Enclosure)
+            // New 8x8m enclosure centered at (0,0,4) roughly
+            // Bounds: X [-3.5, 3.5], Z [0.5, 7.5]
+            var pos = this.el.object3D.position;
+            if (pos.x < -3.5 || pos.x > 3.5 || pos.z < 0.5 || pos.z > 7.5) {
+                // Too close to fence, turn around!
+                this.el.object3D.rotation.y += Math.PI + (Math.random() - 0.5);
+                // Clamp position
+                pos.x = Math.max(-3.4, Math.min(3.4, pos.x));
+                pos.z = Math.max(0.6, Math.min(7.4, pos.z));
+                this.turnTimer = 0;
+            }
+        },
+        turn: function() {
+            this.el.object3D.rotation.y += (Math.random() - 0.5) * 2;
+            this.turnTimer = 0;
+        }
+      });
+
+      // CAT AI - Linear Patrol (Back and Forth)
+      AFRAME.registerComponent("cat-ai", {
+        init: function () {
+            this.speed = 0.02; // Faster
+            this.maxDist = 5;  // 5 meters range
+            this.startPos = this.el.object3D.position.clone();
+            // Start moving forward?
+        },
+        tick: function () {
+            // Move forward (Positive Z seems to be forward for this specific model)
+            this.el.object3D.translateZ(this.speed);
+            
+            // Check distance from start
+            var dist = this.el.object3D.position.distanceTo(this.startPos);
+            if (dist > this.maxDist) {
+                // Turn 180 degrees
+                this.el.object3D.rotation.y += Math.PI;
+                // Reset/Clamp slightly to prevent getting stuck if logic overshoots
+                // But simple rotation is enough, it will walk back
+            }
+        }
+      });
     </script>
   </head>
   <body>
-    <!-- Config Scene avec Physique Ammo (Sans fog pour ciel net) -->
+    <!-- Config Scene avec Physique Ammo (DEBUG DISABLED) -->
     <a-scene
       physics="driver: ammo; debug: false; gravity: -9.8"
       renderer="antialias: false; colorManagement: true; sortObjects: true"
@@ -108,7 +198,7 @@
         ></a-asset-item>
         <a-asset-item
           id="chatModel"
-          src="./assets/models/chat.glb"
+          src="./assets/models/cat.glb"
         ></a-asset-item>
         <a-asset-item
           id="swingModel"
@@ -119,7 +209,6 @@
         <!-- Objet attrapable standard -->
         <a-mixin
           id="grabbable"
-          movement="type: grabbable; stickiness: stickable"
           ammo-shape="type: hull"
           ammo-body="type: dynamic; mass: 1"
         >
@@ -135,7 +224,9 @@
           id="stickMixin"
           gltf-model="#stickModel"
           scale="1 1 1"
-          mixin="grabbable"
+          ammo-body="type: dynamic; mass: 1"
+          ammo-shape="type: box; fit: manual; halfExtents: 0.05 0.05 0.5"
+          fix-physics
         >
         </a-mixin>
 
@@ -143,18 +234,19 @@
           id="hatMixin"
           gltf-model="#hatModel"
           scale="1 1 1"
-          mixin="grabbable"
+          ammo-body="type: dynamic; mass: 1"
+          ammo-shape="type: box; fit: manual; halfExtents: 0.3 0.3 0.3"
+          fix-physics
         >
         </a-mixin>
 
-        <!-- Mixins Christmas (Image User) -->
         <a-mixin
           id="coal"
           material="color:black"
-          geometry="primitive:sphere; segments-height:7; segments-width:13; radius:0.04"
-          movement="type:grabbable; stickiness:stickable"
-          ammo-shape="type:sphere; fit:manual; sphereRadius:0.04"
-          ammo-body="type:dynamic; mass:0.1"
+          geometry="primitive:sphere; segments-height:7; segments-width:13; radius:0.1"
+          ammo-shape="type: box; fit: manual; halfExtents: 0.1 0.1 0.1"
+          ammo-body="type:dynamic; mass:0.1; linearDamping: 0.95; angularDamping: 0.95"
+          fix-physics
         >
         </a-mixin>
         <a-mixin
@@ -162,9 +254,9 @@
           material="color:#5C4033"
           geometry="primitive:branch"
           scale="0.2 0.2 0.2"
-          movement="type:grabbable; stickiness:stickable"
-          ammo-shape="type:hull"
+          ammo-shape="type: box; fit: manual; halfExtents: 0.3 0.1 0.1"
           ammo-body="type:dynamic; mass:0.1"
+          fix-physics
         >
         </a-mixin>
 
@@ -214,10 +306,21 @@
         height="100"
         repeat="20 20"
         material="roughness: 1; metalness: 0"
-        ammo-body="type: static"
-        ammo-shape="type: box"
       >
       </a-plane>
+
+      <!-- SOLID PHYSICS FLOOR (Invisible Box) -->
+      <!-- Positioned slightly below Y=0 (center at -0.5, height 1) so top face is at Y=0 -->
+      <a-box
+        id="physicsFloor"
+        position="0 -0.5 0"
+        width="100"
+        height="1"
+        depth="100"
+        visible="false"
+        ammo-body="type: static"
+        ammo-shape="type: box"
+      ></a-box>
 
       <!-- 4. ÉLÉMENTS SCÉNIQUES -->
       <!-- Hangar -->
@@ -241,149 +344,43 @@
         ammo-shape="type: hull"
       ></a-entity>
 
-      <!-- Enclos (Fence) -->
-      <a-entity position="10 0 -15" id="enclosArea">
-        <!-- Façade -->
-        <a-entity
-          gltf-model="#fenceModel"
-          position="0 0 0"
-          ammo-body="type: static"
-          ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"
-        ></a-entity>
-        <a-entity
-          gltf-model="#fenceModel"
-          position="4 0 0"
-          ammo-body="type: static"
-          ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"
-        ></a-entity>
-        <a-entity
-          gltf-model="#fenceModel"
-          position="8 0 0"
-          ammo-body="type: static"
-          ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"
-        ></a-entity>
-        <!-- Arrière -->
-        <a-entity
-          gltf-model="#fenceModel"
-          position="0 0 8"
-          rotation="0 180 0"
-          ammo-body="type: static"
-          ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"
-        ></a-entity>
-        <a-entity
-          gltf-model="#fenceModel"
-          position="4 0 8"
-          rotation="0 180 0"
-          ammo-body="type: static"
-          ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"
-        ></a-entity>
-        <a-entity
-          gltf-model="#fenceModel"
-          position="8 0 8"
-          rotation="0 180 0"
-          ammo-body="type: static"
-          ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"
-        ></a-entity>
-        <!-- Côtés -->
-        <a-entity
-          gltf-model="#fenceModel"
-          position="-2 0 2"
-          rotation="0 90 0"
-          ammo-body="type: static"
-          ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"
-        ></a-entity>
-        <a-entity
-          gltf-model="#fenceModel"
-          position="-2 0 6"
-          rotation="0 90 0"
-          ammo-body="type: static"
-          ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"
-        ></a-entity>
-        <a-entity
-          gltf-model="#fenceModel"
-          position="10 0 2"
-          rotation="0 90 0"
-          ammo-body="type: static"
-          ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"
-        ></a-entity>
-        <a-entity
-          gltf-model="#fenceModel"
-          position="10 0 6"
-          rotation="0 90 0"
-          ammo-body="type: static"
-          ammo-shape="type: box; fit: manual; halfExtents: 2 1 0.2"
-        ></a-entity>
+      <!-- Enclos (Fence) - Moyen & Moyen Loin -->
+      <!-- Position further back (2 0 -16) -->
+      <a-entity position="2 0 -16" id="enclosArea">
+        <!-- Carré de 8x8m (2 panneaux par côté) -->
+        
+        <!-- Façade (Z=0) covers X[-4, 4] -->
+        <a-entity gltf-model="#fenceModel" position="-2 0 0" scale="1 0.9 1" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 0.6 0.2"></a-entity>
+        <a-entity gltf-model="#fenceModel" position="2 0 0" scale="1 0.9 1" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 0.6 0.2"></a-entity>
+        
+        <!-- Arrière (Z=8) -->
+        <a-entity gltf-model="#fenceModel" position="-2 0 8" scale="1 0.9 1" rotation="0 180 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 0.6 0.2"></a-entity>
+        <a-entity gltf-model="#fenceModel" position="2 0 8" scale="1 0.9 1" rotation="0 180 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 0.6 0.2"></a-entity>
+        
+        <!-- Gauche (X=-4) covers Z[0, 8] -->
+        <a-entity gltf-model="#fenceModel" position="-4 0 2" scale="1 0.9 1" rotation="0 90 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 0.6 0.2"></a-entity>
+        <a-entity gltf-model="#fenceModel" position="-4 0 6" scale="1 0.9 1" rotation="0 90 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 0.6 0.2"></a-entity>
+        
+        <!-- Droite (X=4) -->
+        <a-entity gltf-model="#fenceModel" position="4 0 2" scale="1 0.9 1" rotation="0 90 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 0.6 0.2"></a-entity>
+        <a-entity gltf-model="#fenceModel" position="4 0 6" scale="1 0.9 1" rotation="0 90 0" ammo-body="type: static" ammo-shape="type: box; fit: manual; halfExtents: 2 0.6 0.2"></a-entity>
 
-        <!-- 5 Gnous (Wildebeests) -->
+        <!-- 2 Gnous (Wildebeests) - Inside pen -->
         <a-entity
           id="gnou1"
           gltf-model="#wildebeestModel"
-          position="4 0 4"
+          position="0 0 4"
           scale="0.7 0.7 0.7"
           animation-mixer="clip: *walk*; loop: repeat; timeScale: 1.0"
+          wildebeest-ai
         ></a-entity>
         <a-entity
           id="gnou2"
           gltf-model="#wildebeestModel"
-          position="5 0 5"
+          position="2 0 5"
           scale="0.7 0.7 0.7"
           animation-mixer="clip: *walk*; loop: repeat; timeScale: 0.9"
-        ></a-entity>
-        <a-entity
-          id="gnou3"
-          gltf-model="#wildebeestModel"
-          position="3 0 5"
-          scale="0.7 0.7 0.7"
-          animation-mixer="clip: *walk*; loop: repeat; timeScale: 1.1"
-        ></a-entity>
-        <a-entity
-          id="gnou4"
-          gltf-model="#wildebeestModel"
-          position="5 0 3"
-          scale="0.7 0.7 0.7"
-          animation-mixer="clip: *walk*; loop: repeat; timeScale: 1.05"
-        ></a-entity>
-        <a-entity
-          id="gnou5"
-          gltf-model="#wildebeestModel"
-          position="3 0 3"
-          scale="0.7 0.7 0.7"
-          animation-mixer="clip: *walk*; loop: repeat; timeScale: 0.95"
-        ></a-entity>
-        <a-entity
-          id="gnou1"
-          gltf-model="#wildebeestModel"
-          position="4 0 4"
-          scale="0.7 0.7 0.7"
-          animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 1.0"
-        ></a-entity>
-        <a-entity
-          id="gnou2"
-          gltf-model="#wildebeestModel"
-          position="5 0 5"
-          scale="0.7 0.7 0.7"
-          animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 0.9"
-        ></a-entity>
-        <a-entity
-          id="gnou3"
-          gltf-model="#wildebeestModel"
-          position="3 0 5"
-          scale="0.7 0.7 0.7"
-          animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 1.1"
-        ></a-entity>
-        <a-entity
-          id="gnou4"
-          gltf-model="#wildebeestModel"
-          position="5 0 3"
-          scale="0.7 0.7 0.7"
-          animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 1.05"
-        ></a-entity>
-        <a-entity
-          id="gnou5"
-          gltf-model="#wildebeestModel"
-          position="3 0 3"
-          scale="0.7 0.7 0.7"
-          animation-mixer="clip: wildebeest_male|wildebeest_walk_fwd; loop: repeat; timeScale: 0.95"
+          wildebeest-ai
         ></a-entity>
       </a-entity>
 
@@ -392,13 +389,14 @@
 
       <!-- LE CHAT -->
       <!-- Scale 0.05. Rehaussé Y=0.15 pour ne pas être enterré -->
+      <!-- PATROL AI: Linear walk with turn -->
       <a-entity
         gltf-model="#chatModel"
-        position="-12 0.50 -11"
-        scale="0.02 0.02 0.02"
-        rotation="0 45 0"
-        ammo-body="type: static"
-        ammo-shape="type: hull"
+        position="-12 0 -11"
+        scale="0.0020 0.0020 0.0020"
+        rotation="0 90 0"
+        animation-mixer="clip: *; loop: repeat; timeScale: 2.0"
+        cat-ai
       ></a-entity>
 
       <!-- 5. LA CAISSE SPÉCIALE INTERACTIVE -->
@@ -409,46 +407,70 @@
           id="mainCrate"
           scale="1 1 1"
           ammo-body="type: static"
-          ammo-shape="type: box"
+          ammo-shape="type: box; fit: manual; halfExtents: 0.5 0.5 0.5; offset: 0 0.5 0"
           movement="type: static; stickiness: sticky"
           position="0 0 0"
         >
         </a-entity>
 
-        <!-- Objets posés SUR la caisse -->
-        <!-- Chapeau : Taille réduite (0.2) et posé dessus -->
-        <a-entity
-          mixin="hatMixin"
-          position="0 1.0 0"
-          scale="0.2 0.2 0.2"
-        ></a-entity>
-        <!-- Baton -->
-        <a-entity
-          mixin="stickMixin"
-          position="0.5 1.0 0.2"
-          rotation="0 90 0"
-        ></a-entity>
-        <!-- 3. Coal & Branch (Nouveaux) -->
-        <a-entity mixin="coal" position="-0.3 1.05 0.2"></a-entity>
-        <a-entity
-          mixin="branch"
-          position="0.3 1.02 -0.2"
-          rotation="90 0 0"
-        ></a-entity>
       </a-entity>
+      
+      <!-- Invisible Safety Tabletop for Crate (Ensures loot lands) -->
+      <a-box
+        color="red"
+        visible="false"
+        position="-6 0.9 -11"
+        width="1.2"
+        height="0.2"
+        depth="1.2"
+        ammo-body="type: static"
+        ammo-shape="type: box"
+      ></a-box>
+
+      <!-- LOOT GLOBAL (Un-nested for physics stability) -->
+      <!-- Crate World Pos: -6, 0, -11 -->
+      
+      <!-- Baton: Drop onto crate -->
+      <a-entity
+        mixin="stickMixin"
+        position="-5.8 1.1 -10.9"
+        rotation="90 0 45"
+        ammo-body="type: dynamic; mass: 0.5"
+        sleepy
+      ></a-entity>
+      
+      <!-- Coal: Drop onto crate -->
+      <a-entity 
+        mixin="coal" 
+        position="-6.0 1.1 -11.0" 
+        ammo-body="type: dynamic; mass: 0.5; linearDamping: 0.95"
+        sleepy
+      ></a-entity>
+
+      <!-- CHAPEAU AU SOL (DYNAMIC avec fix sol) -->
+      <a-entity
+          mixin="hatMixin"
+          position="-5 0.3 -10"
+          scale="0.2 0.2 0.2"
+          ammo-body="type: dynamic; mass: 0.5"
+          sleepy
+      ></a-entity>
 
       <!-- 6. JOUEUR (RIG CAMERA) -->
-      <a-entity id="rig">
+      <!-- Kinematic body to interact with physics -->
+      <!-- 6. JOUEUR (RIG CAMERA) -->
+      <!-- NO PHYSICS BODY, pure simple camera rig -->
+      <a-entity id="rig" position="0 0 0">
         <a-camera
           id="camera"
           position="0 1.6 0"
-          look-controls
-          wasd-controls
+          look-controls="pointerLockEnabled: false"
         ></a-camera>
+        
+        <!-- Hands: Visual Only, No Interaction -->
         <a-entity
           id="lhand"
           hand-controls="hand: left"
-          teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: [ammo-shape]"
           visible="true"
         ></a-entity>
         <a-entity
@@ -580,72 +602,17 @@
             y: Math.random() * 360,
             z: 0,
           });
-          container.appendChild(grass);
-        }
-
-        // Batons (Loot)
-        var stickCount = 10;
-        for (var l = 0; l < stickCount; l++) {
-          var x = (Math.random() - 0.5) * 60;
-          var z = (Math.random() - 0.5) * 60;
-          if (!isForbidden(x, z)) {
-            var stick = document.createElement("a-entity");
-            stick.setAttribute("mixin", "stickMixin");
-            stick.setAttribute("position", { x: x, y: 0.1, z: z }); // Pose au sol
-            stick.setAttribute("rotation", {
-              x: 90,
-              y: Math.random() * 360,
-              z: 0,
-            });
-            container.appendChild(stick);
-          }
-        }
+        // Batons, Coals, Hats supprimés de la génération procédurale
+        // (Placement manuel uniquement sur demande)
       }
-
-      // Animation Gnous (5)
-      function animateGnous() {
-        var gnous = [
-          document.querySelector("#gnou1"),
-          document.querySelector("#gnou2"),
-          document.querySelector("#gnou3"),
-          document.querySelector("#gnou4"),
-          document.querySelector("#gnou5"),
-        ];
-
-        var t = 0;
-        setInterval(function () {
-          t += 0.02;
-          gnous.forEach(function (g, index) {
-            if (g && g.object3D) {
-              // Varie Rayon et Phase
-              var offset = index * ((Math.PI * 2) / 5);
-              var r = 2.5 + (index % 2) * 1;
-
-              var x = 4 + Math.cos(t * 0.5 + offset) * r;
-              var z = 4 + Math.sin(t * 0.5 + offset) * r;
-
-              g.object3D.position.set(x, 0, z);
-              // Orientation: Regarder vers l'avant de la marche
-              // Tangente au cercle
-              var angle = t * 0.5 + offset;
-              // En A-Frame Rotation Y: 0 = -Z, 90 = -X...
-              // Angle maths: 0 = +X.
-              // Pour regarder "devant" sur le cercle trigonométrique (sens anti-horaire):
-              // Rotation = -Angle + PI (ou similaire).
-              // On ajuste expérimentalement si "à l'envers".
-              // Essayons Rotation Y = -Angle
-              g.object3D.rotation.y = -angle;
-            }
-          });
-        }, 50);
-      }
+    } // End of createVegetation
 
       // Lancement au chargement
       window.addEventListener("load", function () {
         createRain();
         createVegetation();
-        animateGnous();
       });
     </script>
   </body>
 </html>
+
