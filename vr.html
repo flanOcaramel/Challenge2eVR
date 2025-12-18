@@ -8,8 +8,8 @@
       content="Environnement VR immersif avec physique"
     />
 
-    <!-- 1. IMPORT A-FRAME & LIBRARIES -->
-    <!-- A-Frame Core -->
+    <!-- 1. IMPORTS DES LIBRAIRIES (A-Frame, Physique, etc.) -->
+    <!-- Le cœur de A-Frame -->
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
 
     <!-- A-Frame Extras (Animation, Controls, etc.) -->
@@ -47,15 +47,15 @@
     <script src="https://cdn.jsdelivr.net/gh/MozillaReality/ammo.js@8bbc0ea/builds/ammo.wasm.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-physics-system@v4.2.2/dist/aframe-physics-system.min.js"></script>
 
-    <!-- Teleport Controls -->
-    <!-- Using fernandojsg build which is generally compatible, polyfill above handles the rest -->
+    <!-- Contrôles de Téléportation -->
+    <!-- Le script pour se déplacer en visant le sol -->
     <script src="https://cdn.jsdelivr.net/gh/fernandojsg/aframe-teleport-controls@master/dist/aframe-teleport-controls.min.js"></script>
 
     <!-- Custom User Scripts -->
     <script src="./assets/js/christmas-utils.js"></script>
 
     <script>
-      // Configuration simple pour la pluie (sera lancée plus bas)
+      // Petit script pour faire tomber la pluie
       AFRAME.registerComponent("rain-drop", {
         init: function () {
           this.reset();
@@ -102,7 +102,7 @@
         },
       });
 
-      // AI WILDEBEEST
+      // IA des Gnous (Ils se baladent tranquille dans l'enclos)
       AFRAME.registerComponent("wildebeest-ai", {
         init: function () {
             this.direction = new THREE.Vector3(0, 0, 1);
@@ -139,7 +139,7 @@
         }
       });
 
-      // CAT AI - Linear Patrol (Back and Forth)
+      // IA du Chat (Il fait des allers-retours)
       AFRAME.registerComponent("cat-ai", {
         init: function () {
             this.speed = 0.02; // Faster
@@ -162,9 +162,9 @@
         }
       });
 
-        // --- Grab system: components `grabbable` and `grabber` ---
-        // Grabbable: attach this component (and optionally class="grabbable") to any entity
-        // Grabber: attach to a hand entity or camera to enable grabbing with trigger/grip or mouse
+        // --- Système de Grab (Pour attraper des trucs) ---
+        // Grabbable : On met ça sur l'objet qu'on veut pouvoir prendre (avec la classe CSS qui va bien)
+        // Grabber : On met ça sur la main ou la caméra pour pouvoir attraper
         (function(){
             AFRAME.registerComponent('grabbable', {
                 schema: {},
@@ -268,7 +268,8 @@
                 }
             });
 
-            // COMPONENT: 'Enter' Key Teleport (Smart PC + VR Sim)
+            // Composant : Téléportation sur PC (Touche Entrée)
+            // Ça simule le fait d'appuyer sur la gâchette en VR pour ceux qui ont pas de casque
             AFRAME.registerComponent('enter-teleport-trigger', {
                 init: function() {
                     this.onKeyDown = this.onKeyDown.bind(this);
@@ -328,7 +329,7 @@
                     this.el.addEventListener('triggerup', this.onUp);
                     this.el.addEventListener('gripup', this.onUp);
 
-                    // Mouse support
+                    // Support de la souris (Pour le PC)
                     if (this.el.hasAttribute('cursor')) {
                         this.isMouse = true;
                         window.addEventListener('mousedown', this.onDown);
@@ -458,8 +459,8 @@
                          sceneEl.appendChild(released);
                     }
 
-                    // 2. SNAP TO GROUND LOGIC
-                    var currentPos = new THREE.Vector3();
+                    // 2. LOGIQUE POUR POSER AU SOL
+                    // On récupère la position actuelle de l'objet
                     released.object3D.getWorldPosition(currentPos);
                     
                     var safeY = currentPos.y;
@@ -526,7 +527,7 @@
     </script>
   </head>
   <body>
-    <!-- Config Scene avec Physique Ammo (DEBUG DISABLED) -->
+    <!-- Scène configurée avec la physique Ammo (Gravité standard) -->
     <a-scene physics="driver: ammo; debug: false; gravity: -9.8" 
              renderer="colorManagement: true; physicallyCorrectLights: true; sortObjects: true"
              enter-teleport-trigger
@@ -589,8 +590,8 @@
           src="./assets/models/balancoire.glb"
         ></a-asset-item>
 
-        <!-- Mixins Physiques & Interactions -->
-        <!-- Objet attrapable standard (Logic Only) -->
+        <!-- Mixins : Des configurations toutes prêtes pour la physique et les interactions -->
+        <!-- Objet attrapable de base -->
         <a-mixin
           id="grabbable"
           grabbable
@@ -653,8 +654,8 @@
         </a-mixin>
       </a-assets>
 
-      <!-- 3. ENVIRONNEMENT -->
-      <!-- Ciel Ensoleillé (Bleu pur) -->
+      <!-- 3. L'ENVIRONNEMENT -->
+      <!-- Un beau ciel bleu -->
       <a-sky color="#87CEEB"></a-sky>
 
       <!-- Soleil -->
@@ -683,8 +684,8 @@
       >
       </a-plane>
 
-      <!-- SOLID PHYSICS FLOOR (Invisible Box) -->
-      <!-- Positioned at Y=-25 with height 50 so top face is at Y=0 -->
+      <!-- SOL PHYSIQUE (Invisible) -->
+      <!-- C'est une grosse boîte invisible sous le sol pour que les objets ne tombent pas dans le vide -->
       <a-box
         id="physicsFloor"
         position="0 -25 0"
@@ -832,18 +833,18 @@
 
 
 
-      <!-- 6. JOUEUR (RIG CAMERA) - RESTORED w/ GRABBER -->
-        <!-- 6. JOUEUR (RIG CAMERA) - RESTORED w/ GRABBER & MOVEMENT -->
-        <!-- Added movement-controls for joystick locomotion -->
+      <!-- 6. LE JOUEUR (Le Rig) -->
+        <!-- C'est ici que tout se passe pour les contrôles -->
         <a-entity id="rig" movement-controls="speed: 0.15; constrainToNavMesh: false">
             <a-camera id="camera" position="0 1.6 0" look-controls>
-                <!-- Allow desktop cursor to hit UI AND Grabbable objects on PC -->
-                <!-- Allow desktop cursor to hit UI AND Grabbable objects on PC -->
+                <!-- Curseur pour le PC (qui permet de cliquer sur les trucs) -->
                 <a-entity cursor="rayOrigin: mouse" raycaster="objects: .clickable, .grabbable, [mixin*='grabbable']" grabber></a-entity>
             </a-camera>
+            <!-- Main Gauche : Téléportation (Touche Entrée ou Gâchette VR) -->
             <a-entity id="lhand" hand-controls="hand: left" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: [ammo-shape]; startEvents: teleportstart; endEvents: teleportend" visible="true"></a-entity>
+            <!-- Main Droite : Pour attraper les objets (Gâchette VR ou Clic PC) -->
             <a-entity id="rhand" hand-controls="hand: right" visible="true" grabber raycaster="objects: .grabbable, .clickable, [mixin*='grabbable']; showLine: false"></a-entity>
-            <!-- Laser controls for pointer interaction with keys -->
+            <!-- Laser controls pour les menus si besoin -->
             <a-entity laser-controls="hand: right" raycaster="objects: .clickable"></a-entity>
             <a-entity laser-controls="hand: left" raycaster="objects: .clickable"></a-entity>
         </a-entity>
