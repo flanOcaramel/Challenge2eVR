@@ -462,6 +462,34 @@
                 }
             });
 
+            // Thrown fallback: apply simple kinematic velocity when physics not available
+            AFRAME.registerComponent('thrown', {
+                schema: {
+                    v: { type: 'vec3' },
+                    life: { type: 'number', default: 1.5 }
+                },
+                init: function() {
+                    this.age = 0;
+                    this.velocity = new THREE.Vector3(this.data.v.x, this.data.v.y, this.data.v.z);
+                },
+                tick: function(time, delta) {
+                    var dt = delta / 1000;
+                    this.age += dt;
+                    if (this.age > this.data.life) {
+                        this.el.removeAttribute('thrown');
+                        return;
+                    }
+                    // simple gravity
+                    this.velocity.y -= 9.8 * dt;
+                    var pos = this.el.object3D.position;
+                    pos.x += this.velocity.x * dt;
+                    pos.y += this.velocity.y * dt;
+                    pos.z += this.velocity.z * dt;
+                    this.el.object3D.position.copy(pos);
+                    this.el.object3D.updateMatrixWorld(true);
+                }
+            });
+
             AFRAME.registerComponent('grabber', {
                 schema: {},
                 init: function() {
@@ -471,6 +499,10 @@
                     this.tempMatrix = new THREE.Matrix4();
                     // store original physics attributes for grabbed entities
                     this._grabbedOriginals = new WeakMap();
+                    // hand motion history for throw velocity
+                    this._handHistory = [];
+                    this._maxHistory = 6; // samples
+                    this._lastClickTime = 0;
 
                     this.onDown = this.onDown.bind(this);
                     this.onUp = this.onUp.bind(this);
@@ -485,6 +517,8 @@
                     this._cursor = scene && scene.querySelector('[cursor]');
                     if (this._cursor) {
                         this._cursor.addEventListener('click', this.onCursorClick);
+                        this.onCursorDoubleClick = this.onCursorDoubleClick.bind(this);
+                        this._cursor.addEventListener('dblclick', this.onCursorDoubleClick);
                     }
 
                     window.addEventListener('mouseup', this.onUp);
@@ -502,6 +536,8 @@
                 onDown: function(evt) {
                     console.log('[grabber] onDown', this.el.id || this.el);
                     if (this.grabbedEl) return;
+                    // controller input
+                    this._lastInputWasCursor = false;
 
                     if (evt && evt.detail && evt.detail.intersectedEl) {
                         console.log('[grabber] event provided intersectedEl', evt.detail.intersectedEl.id || evt.detail.intersectedEl);
@@ -531,12 +567,84 @@
 
                 onCursorClick: function(evt) {
                     console.log('[grabber] onCursorClick');
-                    if (this.grabbedEl) return;
-                    var cand = evt && evt.detail && evt.detail.intersectedEl ? evt.detail.intersectedEl : null;
+                    // double-click detection (manual): two clicks within 350ms
+                    var now = performance.now();
+                    var isDouble = (now - (this._lastClickTime || 0)) < 350;
+                    this._lastClickTime = now;
+
+                    // mark that this click came from cursor
+                    this._lastInputWasCursor = true;
+
+                    // resolve candidate from event or raycaster fallback
+                    var cand = null;
+                    if (evt && evt.detail && evt.detail.intersectedEl) {
+                        cand = evt.detail.intersectedEl;
+                    } else if (this._cursor && this._cursor.components && this._cursor.components.raycaster) {
+                        try {
+                            var ints = this._cursor.components.raycaster.intersections || [];
+                            if (ints.length) cand = ints[0].object && ints[0].object.el ? ints[0].object.el : null;
+                        } catch(e) { console.warn('[grabber] reading cursor intersections failed', e); }
+                    }
+
+                    // If already holding and grabbed by cursor, allow double-click to release
+                    if (this.grabbedEl && this._grabbedByCursor) {
+                        if (isDouble) {
+                            console.log('[grabber] cursor double-click -> release');
+                            this.onUp({ type: 'dblclick' });
+                        } else {
+                            console.log('[grabber] cursor click while holding (waiting for dblclick)');
+                        }
+                        return;
+                    }
+
+                    // If already holding with controller, ignore cursor click
+                    if (this.grabbedEl && !this._grabbedByCursor) {
+                        console.log('[grabber] cursor click ignored; holding with controller');
+                        return;
+                    }
+
+                    if (isDouble) {
+                        // double-click while not holding -> try grab then immediately release
+                        if (cand) {
+                            console.log('[grabber] cursor double-click attempting quick grab', cand.id || cand);
+                            this._tryGrabCandidate(cand);
+                        }
+                        return;
+                    }
+
+                    // single click -> attempt grab
                     if (cand) {
                         console.log('[grabber] cursor intersected', cand.id || cand);
                         this._tryGrabCandidate(cand);
+                    } else {
+                        console.log('[grabber] cursor click but no intersectedEl found');
                     }
+                },
+
+                onCursorDoubleClick: function(evt) {
+                    // double-click: if holding via cursor, release; otherwise try grab
+                    console.log('[grabber] onCursorDoubleClick');
+                    if (this.grabbedEl && this._grabbedByCursor) {
+                        // call onUp with synthetic dblclick event so release runs
+                        this.onUp({ type: 'dblclick' });
+                        return;
+                    }
+                    // not holding: behave like a click attempt to grab
+                    var cand = evt && evt.detail && evt.detail.intersectedEl ? evt.detail.intersectedEl : null;
+                    if (cand) {
+                        this._lastInputWasCursor = true;
+                        this._tryGrabCandidate(cand);
+                    }
+                },
+
+                // sample hand position each tick even when not grabbing
+                _sampleHand: function(now) {
+                    try {
+                        var p = new THREE.Vector3();
+                        this.el.object3D.getWorldPosition(p);
+                        this._handHistory.push({ p: p.clone(), t: now });
+                        if (this._handHistory.length > this._maxHistory) this._handHistory.shift();
+                    } catch(e) { /* ignore */ }
                 },
 
                 _tryGrabCandidate: function(candidate) {
@@ -591,12 +699,40 @@
                     }
 
                     this.grabbedEl = targetEl;
+                    // remember if this grab came from cursor input
+                    this._grabbedByCursor = !!this._lastInputWasCursor;
                     this.grabbedEl.emit('grabbed', { by: this.el });
                 },
 
                 onUp: function(evt) {
                     console.log('[grabber] onUp');
                     if (!this.grabbedEl) return;
+                    // if grabbed via cursor, only accept dblclick release
+                    if (this._grabbedByCursor && !(evt && evt.type === 'dblclick')) {
+                        console.log('[grabber] ignoring mouseup because release requires dblclick');
+                        return;
+                    }
+
+                    // compute throw velocity from history
+                    var now = performance.now() / 1000;
+                    // include latest sample
+                    this._sampleHand(now);
+                    var hist = this._handHistory;
+                    var vx = 0, vy = 0, vz = 0;
+                    if (hist.length >= 2) {
+                        var first = hist[0];
+                        var last = hist[hist.length - 1];
+                        var dt = last.t - first.t;
+                        if (dt <= 0) dt = 0.016;
+                        vx = (last.p.x - first.p.x) / dt;
+                        vy = (last.p.y - first.p.y) / dt;
+                        vz = (last.p.z - first.p.z) / dt;
+                    }
+                    var throwFactor = 1.5;
+                    var throwVel = new THREE.Vector3(vx * throwFactor, vy * throwFactor, vz * throwFactor);
+                    // cap
+                    var maxSpeed = 30;
+                    if (throwVel.length() > maxSpeed) throwVel.setLength(maxSpeed);
 
                     var released = this.grabbedEl;
                     var worldMat = new THREE.Matrix4().copy(released.object3D.matrixWorld);
@@ -625,11 +761,37 @@
                     released.object3D.updateMatrixWorld(true);
 
                     released.emit('released', { by: this.el });
-                    console.log('[grabber] released', released.id || released);
+                    console.log('[grabber] released', released.id || released, 'throwVel=', throwVel);
+                    // attempt to apply physics linear velocity if ammo is present
+                    try {
+                        // small timeout to allow physics body recreation after restoring ammo-body
+                        setTimeout(function() {
+                            try {
+                                var body = released.body || released.getAttribute && released.getAttribute('body');
+                                if (body && window.Ammo && released.body) {
+                                    var btVec = new Ammo.btVector3(throwVel.x, throwVel.y, throwVel.z);
+                                    released.body.setLinearVelocity(btVec);
+                                    // wake up
+                                    released.body.activate && released.body.activate();
+                                    console.log('[grabber] applied Ammo linear velocity');
+                                } else {
+                                    // fallback: add thrown component to simulate
+                                    released.setAttribute('thrown', { v: throwVel.x + ' ' + throwVel.y + ' ' + throwVel.z, life: 1.5 });
+                                    console.log('[grabber] applied fallback thrown component');
+                                }
+                            } catch(e) { console.warn('[grabber] apply throw failed', e); }
+                        }, 40);
+                    } catch(e) { console.warn('[grabber] scheduling throw failed', e); }
+
                     this.grabbedEl = null;
+                    this._grabbedByCursor = false;
                 },
 
-                tick: function() {
+                tick: function(time, delta) {
+                    var now = performance.now() / 1000;
+                    // always sample hand movement
+                    this._sampleHand(now);
+
                     if (!this.grabbedEl) return;
 
                     this.tempMatrix.copy(this.el.object3D.matrixWorld).multiply(this.offsetMatrix);
