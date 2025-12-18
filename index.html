@@ -3,13 +3,11 @@
 <head>
     <title>Challenge2e VR Carousel</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-    <script src="https://unpkg.com/aframe-super-hands@3.0.0/dist/super-hands.min.js"></script>
-    <script src="https://unpkg.com/aframe-physics-system@4.0.0/dist/aframe-physics-system.min.js"></script>
 </head>
 <body>
-    <a-scene physics="gravity: 0">
+    <a-scene>
         <a-camera position="0 1.6 0">
-            <a-cursor></a-cursor>
+            <a-cursor raycaster="objects: .clickable"></a-cursor>
         </a-camera>
 
         <a-entity id="carousel" position="0 1.6 -3" rotation="0 0 0">
@@ -32,11 +30,21 @@
         let users = [];
         let selectedUser = null;
 
-        // Fetch users from API
-        fetch('http://localhost/Challenge2e/public/api.php')
+        // Fetch users from Challenge2e DB via API
+        fetch('https://selles-francesconi.sio-chopin.fr/Challenge2e/public/api.php')
             .then(response => response.json())
             .then(data => {
                 users = data;
+                createCarousel();
+            })
+            .catch(error => {
+                console.error('Error fetching users:', error);
+                // Fallback to mock data
+                users = [
+                    { username: 'Alice', modelAvatar: 'adventurer.glb', nameWorld: 'Plaine', urlWorld: 'vr.html' },
+                    { username: 'Bob', modelAvatar: 'astronaut.glb', nameWorld: 'Mer', urlWorld: 'http://example.com/mer' },
+                    { username: 'Charlie', modelAvatar: 'pug.glb', nameWorld: 'Plaine', urlWorld: 'vr.html' }
+                ];
                 createCarousel();
             });
 
@@ -91,7 +99,7 @@
 
         document.getElementById('submit-btn').addEventListener('click', () => {
             const password = document.getElementById('password-input').value;
-            fetch('http://localhost/Challenge2e/public/login.php', {
+            fetch('https://selles-francesconi.sio-chopin.fr/Challenge2e/public/login.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username: selectedUser.username, password: password })
@@ -99,10 +107,14 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    window.location.href = 'vr.html';
+                    window.location.href = 'https://selles-francesconi.sio-chopin.fr/Challenge2eVR/vr.html';
                 } else {
                     alert('Incorrect password');
                 }
+            })
+            .catch(error => {
+                console.error('Login error:', error);
+                alert('Login service unavailable');
             });
         });
 
@@ -111,7 +123,7 @@
             document.getElementById('password-input').value = '';
         });
 
-        // For carousel rotation (simplified, not grab yet)
+        // For carousel rotation
         document.addEventListener('keydown', (e) => {
             const carousel = document.getElementById('carousel');
             let rotation = carousel.getAttribute('rotation');
@@ -121,6 +133,30 @@
                 rotation.y -= 10;
             }
             carousel.setAttribute('rotation', rotation);
+        });
+
+        // Mouse drag to rotate carousel
+        let isDragging = false;
+        let previousMouseX = 0;
+
+        document.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            previousMouseX = e.clientX;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                const deltaX = e.clientX - previousMouseX;
+                const carousel = document.getElementById('carousel');
+                let rotation = carousel.getAttribute('rotation');
+                rotation.y += deltaX * 0.5; // Sensitivity
+                carousel.setAttribute('rotation', rotation);
+                previousMouseX = e.clientX;
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
         });
     </script>
 </body>
