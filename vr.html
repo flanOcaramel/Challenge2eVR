@@ -740,8 +740,10 @@
       ></a-box>
 
       <!-- 6. JOUEUR (RIG CAMERA) - RESTORED w/ GRABBER -->
-        <a-entity id="rig">
-            <a-camera id="camera" position="0 1.6 0" look-controls wasd-controls>
+        <!-- 6. JOUEUR (RIG CAMERA) - RESTORED w/ GRABBER & MOVEMENT -->
+        <!-- Added movement-controls for joystick locomotion -->
+        <a-entity id="rig" movement-controls="speed: 0.15; constrainToNavMesh: false">
+            <a-camera id="camera" position="0 1.6 0" look-controls>
                 <!-- Allow desktop cursor to hit UI only (clickable), preventing Grab interactions on PC -->
                 <a-entity cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
             </a-camera>
