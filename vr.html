@@ -286,6 +286,12 @@
                     this.el.addEventListener('gripdown', this.onDown);
                     this.el.addEventListener('triggerup', this.onUp);
                     this.el.addEventListener('gripup', this.onUp);
+
+                    // Mouse support for PC (if attached to Cursor)
+                    if (this.el.hasAttribute('cursor')) {
+                        window.addEventListener('mousedown', this.onDown);
+                        window.addEventListener('mouseup', this.onUp);
+                    }
                 },
 
                 remove: function() {
@@ -293,6 +299,12 @@
                     this.el.removeEventListener('gripdown', this.onDown);
                     this.el.removeEventListener('triggerup', this.onUp);
                     this.el.removeEventListener('gripup', this.onUp);
+
+                    // Remove Mouse support
+                    if (this.el.hasAttribute('cursor')) {
+                        window.removeEventListener('mousedown', this.onDown);
+                        window.removeEventListener('mouseup', this.onUp);
+                    }
                 },
 
                 onDown: function(evt) {
@@ -764,8 +776,8 @@
         <!-- Added movement-controls for joystick locomotion -->
         <a-entity id="rig" movement-controls="speed: 0.15; constrainToNavMesh: false">
             <a-camera id="camera" position="0 1.6 0" look-controls>
-                <!-- Allow desktop cursor to hit UI only (clickable), preventing Grab interactions on PC -->
-                <a-entity cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
+                <!-- Allow desktop cursor to hit UI AND Grabbable objects on PC -->
+                <a-entity cursor="rayOrigin: mouse" raycaster="objects: .clickable, .grabbable" grabber></a-entity>
             </a-camera>
             <a-entity id="lhand" hand-controls="hand: left" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: [ammo-shape]; startEvents: teleportstart; endEvents: teleportend" visible="true" grabber raycaster="objects: .grabbable, .clickable; showLine: false"></a-entity>
             <a-entity id="rhand" hand-controls="hand: right" visible="true" grabber raycaster="objects: .grabbable, .clickable; showLine: false"></a-entity>
