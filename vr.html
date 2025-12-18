@@ -582,6 +582,36 @@
             createVegetation();
             animateGnous(); 
         });
+
+        // Fix: delay applying ammo-shape for entities that use a glTF model and the `grabbable` mixin/class.
+        // Some ammo-shape fit modes require the mesh to be present (object3DMap.mesh). When mixins
+        // apply ammo-shape before the model is loaded, the physics system throws "Cannot use FIT.ALL without object3DMap.mesh".
+        // Here we listen for `model-loaded` events and apply a sensible ammo-shape/body if missing.
+        (function(){
+            var scene = document.querySelector('a-scene');
+            if (!scene) return;
+            scene.addEventListener('model-loaded', function(evt){
+                var el = evt && evt.target;
+                if (!el) return;
+                // If element or its parents use the grabbable mixin/class, ensure ammo attributes exist
+                var checkEl = el;
+                while (checkEl && checkEl !== scene) {
+                    var mixinAttr = checkEl.getAttribute('mixin') || '';
+                    var isGrabbable = checkEl.classList && checkEl.classList.contains('grabbable') || (mixinAttr && mixinAttr.split(' ').indexOf('grabbable') !== -1);
+                    if (isGrabbable) {
+                        // If ammo-shape missing, set a default hull shape now that mesh exists
+                        if (!checkEl.hasAttribute('ammo-shape')) {
+                            checkEl.setAttribute('ammo-shape', 'type: hull');
+                        }
+                        if (!checkEl.hasAttribute('ammo-body')) {
+                            checkEl.setAttribute('ammo-body', 'type: dynamic; mass: 1');
+                        }
+                        break;
+                    }
+                    checkEl = checkEl.parentEl;
+                }
+            });
+        })();
     </script>
 </body>
 </html>
