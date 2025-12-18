@@ -154,7 +154,7 @@
             ammo-shape="type: box; fit: manual; halfExtents: 5 4 5; offset: 0 4 0">
         </a-entity>
         <!-- Example grabbable object (desktop + VR) - moved away from keyboard -->
-        <a-box grabbable class="grabbable" position="0 1.2 -2.5" depth="0.25" height="0.25" width="0.25" color="#4CC3D9" material="metalness:0.2; roughness:0.6"></a-box>
+        <a-box grabbable class="grabbable clickable" position="0 1.2 -2.5" depth="0.25" height="0.25" width="0.25" color="#4CC3D9" material="metalness:0.2; roughness:0.6"></a-box>
 
         <!-- Balançoire (Devant la maison) -->
         <!-- Réduite de 15% addtionnelle (0.02 * 0.85 = 0.017) -->
@@ -214,7 +214,8 @@
         <!-- 6. JOUEUR (RIG CAMERA) -->
         <a-entity id="rig">
             <a-camera id="camera" position="0 1.6 0" look-controls wasd-controls>
-                <a-entity cursor="rayOrigin: mouse" raycaster="objects: .clickable"></a-entity>
+                <!-- Allow desktop cursor to hit grabbable objects too -->
+                <a-entity cursor="rayOrigin: mouse" raycaster="objects: .grabbable, .clickable"></a-entity>
             </a-camera>
             <a-entity id="lhand" hand-controls="hand: left" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: [ammo-shape]" visible="true" grabber raycaster="objects: .grabbable, .clickable; showLine: false"></a-entity>
             <a-entity id="rhand" hand-controls="hand: right" visible="true" grabber raycaster="objects: .grabbable, .clickable; showLine: false"></a-entity>
