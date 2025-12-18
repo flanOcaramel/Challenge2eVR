@@ -49,8 +49,7 @@
 </head>
 <body>
     <!-- Config Scene avec Physique Ammo (Sans fog pour ciel net) -->
-    <a-scene 
-        physics="driver: ammo; debug: false; gravity: -9.8"
+    <a-scene
         renderer="antialias: false; colorManagement: true; sortObjects: true">
 
         <!-- 2. ASSETS -->
@@ -217,7 +216,7 @@
                 <!-- Allow desktop cursor to hit grabbable objects too -->
                 <a-entity cursor="rayOrigin: mouse" raycaster="objects: .grabbable, .clickable"></a-entity>
             </a-camera>
-            <a-entity id="lhand" hand-controls="hand: left" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: [ammo-shape]" visible="true" grabber raycaster="objects: .grabbable, .clickable; showLine: false"></a-entity>
+            <a-entity id="lhand" hand-controls="hand: left" teleport-controls="cameraRig: #rig; teleportOrigin: #camera; button: trigger; collisionEntities: [ammo-shape]" visible="true" raycaster="objects: .grabbable, .clickable; showLine: false"></a-entity>
             <a-entity id="rhand" hand-controls="hand: right" visible="true" grabber raycaster="objects: .grabbable, .clickable; showLine: false"></a-entity>
             <!-- Laser controls for pointer interaction with keys -->
             <a-entity laser-controls="hand: right" raycaster="objects: .clickable"></a-entity>
@@ -587,11 +586,15 @@
                     }
 
                     // If already holding and grabbed by cursor, allow double-click to release
-                        if (this.grabbedEl && this._grabbedByCursor) {
-                            console.log('[grabber] cursor click while holding -> release');
-                            this.onUp({ type: 'click' });
-                            return;
+                    if (this.grabbedEl && this._grabbedByCursor) {
+                        if (isDouble) {
+                            console.log('[grabber] cursor double-click -> release');
+                            this.onUp({ type: 'dblclick' });
+                        } else {
+                            console.log('[grabber] cursor click while holding (waiting for dblclick)');
                         }
+                        return;
+                    }
 
                     // If already holding with controller, ignore cursor click
                     if (this.grabbedEl && !this._grabbedByCursor) {
@@ -646,6 +649,8 @@
                 _tryGrabCandidate: function(candidate) {
                     var el = candidate;
                     while (el && el.tagName && el.tagName.toLowerCase() !== 'a-scene') {
+                        // ignore teleport cursor visuals so they are not grabbed
+                        if (el.classList && el.classList.contains && el.classList.contains('teleport-cursor')) return;
                         if (el.components && el.components.grabbable) break;
                         if (el.classList && el.classList.contains('grabbable')) break;
                         el = el.parentEl;
@@ -703,9 +708,10 @@
                 onUp: function(evt) {
                     console.log('[grabber] onUp');
                     if (!this.grabbedEl) return;
-                    // if grabbed via cursor, accept mouse release (click/dblclick) or explicit dbl event
-                    if (this._grabbedByCursor && evt && evt.type && evt.type === 'mouseup') {
-                        // allow
+                    // if grabbed via cursor, only accept dblclick release
+                    if (this._grabbedByCursor && !(evt && evt.type === 'dblclick')) {
+                        console.log('[grabber] ignoring mouseup because release requires dblclick');
+                        return;
                     }
 
                     // compute throw velocity from history
@@ -747,13 +753,27 @@
                     var sceneEl = this.el.sceneEl;
                     sceneEl.appendChild(released);
 
+                    // Apply world transform immediately so the entity appears where released
                     released.object3D.matrix.copy(worldMat);
                     var pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scale = new THREE.Vector3();
                     released.object3D.matrix.decompose(pos, quat, scale);
+                    // Set object3D transforms
                     released.object3D.position.copy(pos);
                     released.object3D.quaternion.copy(quat);
                     released.object3D.scale.copy(scale);
                     released.object3D.updateMatrixWorld(true);
+
+                    // Also set HTML attributes so A-Frame and physics drivers can pick them up reliably
+                    try {
+                        released.setAttribute('position', { x: pos.x, y: pos.y, z: pos.z });
+                        var euler = new THREE.Euler().setFromQuaternion(quat, 'YXZ');
+                        // convert to degrees for A-Frame rotation attribute (use MathUtils if available)
+                        var radToDeg = (THREE.MathUtils && THREE.MathUtils.radToDeg) ? THREE.MathUtils.radToDeg : (THREE.Math && THREE.Math.radToDeg ? THREE.Math.radToDeg : function(r){ return r * 180 / Math.PI; });
+                        released.setAttribute('rotation', { x: radToDeg(euler.x), y: radToDeg(euler.y), z: radToDeg(euler.z) });
+                        released.setAttribute('scale', { x: scale.x, y: scale.y, z: scale.z });
+                        // ensure visible
+                        released.setAttribute('visible', true);
+                    } catch (e) { console.warn('[grabber] setAttribute after release failed', e); }
 
                     released.emit('released', { by: this.el });
                     console.log('[grabber] released', released.id || released, 'throwVel=', throwVel);
@@ -814,6 +834,132 @@
                     this.grabbedEl.object3D.updateMatrixWorld(true);
                 }
             });
+
+            // Teleport-controls: simple teleportation system for VR and desktop
+            // - Attach to a controller entity (VR) or to the camera (desktop fallback).
+            // - While the activation button is held, cast a ray and show a cursor on valid ground.
+            // - On release, move the `#rig` entity so the camera's world XZ aligns with the selected point.
+            // - Only allows teleportation onto elements matching a-plane, class `teleportable`, or static `ammo-body`.
+            if (!AFRAME.components['teleport-controls']) {
+                AFRAME.registerComponent('teleport-controls', {
+                    schema: {
+                        button: { type: 'string', default: 'trigger' }, // not strictly required for desktop
+                        maxDistance: { type: 'number', default: 30 },
+                        groundSelector: { type: 'string', default: '.teleportable,a-plane' }
+                    },
+                    init: function () {
+                        this.holding = false;
+                        this.validPoint = null;
+                        this.raycaster = null;
+
+                        // Create a visible cursor (ring) placed on teleport target
+                        this.cursor = document.createElement('a-entity');
+                        // mark this entity so other systems (eg. grabber) ignore it
+                        this.cursor.classList.add('teleport-cursor');
+                        this.cursor.setAttribute('geometry', 'primitive: ring; radiusInner: 0.18; radiusOuter: 0.25');
+                        this.cursor.setAttribute('material', 'color: #33FF99; shader: flat; opacity: 0.95');
+                        this.cursor.setAttribute('rotation', '-90 0 0');
+                        this.cursor.setAttribute('visible', false);
+                        this.el.sceneEl.appendChild(this.cursor);
+
+                        // Event handlers
+                        this._onDown = this._onDown.bind(this);
+                        this._onUp = this._onUp.bind(this);
+                        this._onContext = this._onContext.bind(this);
+
+                        // VR controller events
+                        this.el.addEventListener('triggerdown', this._onDown);
+                        this.el.addEventListener('gripdown', this._onDown);
+                        this.el.addEventListener('triggerup', this._onUp);
+                        this.el.addEventListener('gripup', this._onUp);
+
+                        // Desktop fallback: use right-click (contextmenu) to toggle aiming/teleport
+                        // Do NOT listen to left-click here to avoid conflict with grabber (left-click/grab).
+                        window.addEventListener('contextmenu', this._onContext);
+                    },
+                    remove: function () {
+                        this.el.removeEventListener('triggerdown', this._onDown);
+                        this.el.removeEventListener('gripdown', this._onDown);
+                        this.el.removeEventListener('triggerup', this._onUp);
+                        this.el.removeEventListener('gripup', this._onUp);
+                        this.el.removeEventListener('mousedown', this._onDown);
+                        // window.removeEventListener('mouseup', this._onUp);
+                        window.removeEventListener('contextmenu', this._onContext);
+                        if (this.cursor && this.cursor.parentNode) this.cursor.parentNode.removeChild(this.cursor);
+                    },
+                    _onContext: function (ev) {
+                        ev.preventDefault();
+                        // Toggle hold state on right-click (useful for desktop aiming)
+                        if (!this.holding) this._onDown(); else this._onUp();
+                    },
+                    _onDown: function (evt) {
+                        this.holding = true;
+                        this.cursor.setAttribute('visible', true);
+                        // Ensure we have a raycaster
+                        if (!this.raycaster) {
+                            this.el.setAttribute('raycaster', 'objects: ' + this.data.groundSelector + '; showLine: false; far: ' + this.data.maxDistance);
+                            this.raycaster = this.el.components && this.el.components.raycaster;
+                        }
+                    },
+                    _onUp: function (evt) {
+                        var scene = this.el.sceneEl;
+                        this.holding = false;
+                        this.cursor.setAttribute('visible', false);
+
+                        if (!this.validPoint) return;
+
+                        try {
+                            var rig = scene.querySelector('#rig');
+                            if (!rig) return;
+                            var cam = scene.querySelector('#camera');
+                            // Move rig so camera's world XZ aligns with target point
+                            var target = this.validPoint.clone();
+                            if (cam) {
+                                // Camera's local position relative to rig
+                                var camLocal = cam.object3D.position.clone();
+                                var newRigX = target.x - camLocal.x;
+                                var newRigZ = target.z - camLocal.z;
+                                var rigPos = rig.getAttribute('position') || { x: 0, y: 0, z: 0 };
+                                rig.setAttribute('position', { x: newRigX, y: rigPos.y || 0, z: newRigZ });
+                            } else {
+                                rig.setAttribute('position', { x: target.x, y: target.y, z: target.z });
+                            }
+                        } catch (e) { console.warn('[teleport-controls] teleport failed', e); }
+
+                        this.validPoint = null;
+                    },
+                    tick: function () {
+                        if (!this.holding) return;
+                        if (!this.raycaster) return;
+
+                        var ints = [];
+                        try { ints = this.raycaster.intersections || []; } catch (e) { ints = []; }
+                        if (!ints || !ints.length) { this.validPoint = null; this.cursor.setAttribute('visible', false); return; }
+
+                        // Find first valid intersection on allowed ground
+                        var found = null;
+                        for (var i = 0; i < ints.length; i++) {
+                            var el = ints[i].object && ints[i].object.el ? ints[i].object.el : null;
+                            if (!el) continue;
+                            var isPlane = el.tagName && el.tagName.toLowerCase() === 'a-plane';
+                            var isTeleportable = el.classList && el.classList.contains('teleportable');
+                            var hasStaticBody = false;
+                            try {
+                                var ab = el.getAttribute && el.getAttribute('ammo-body');
+                                if (ab && typeof ab === 'string' && ab.indexOf('type: static') !== -1) hasStaticBody = true;
+                            } catch (e) {}
+                            if (isPlane || isTeleportable || hasStaticBody) { found = ints[i]; break; }
+                        }
+
+                        if (!found) { this.validPoint = null; this.cursor.setAttribute('visible', false); return; }
+
+                        var pt = found.point;
+                        this.validPoint = new THREE.Vector3(pt.x, pt.y, pt.z);
+                        this.cursor.object3D.position.copy(this.validPoint);
+                        this.cursor.object3D.visible = true;
+                    }
+                });
+            }
         })();
 
         // Lancement au chargement
@@ -821,6 +967,14 @@
             createRain();
             createVegetation();
             animateGnous(); 
+            // Initialize physics after load so models are present and FIT.ALL won't run prematurely
+            try {
+                var scene = document.querySelector('a-scene');
+                if (scene && !scene.hasAttribute('physics')) {
+                    scene.setAttribute('physics', 'driver: ammo; debug: false; gravity: -9.8');
+                    console.log('[init] physics system attached on load');
+                }
+            } catch (e) { console.warn('[init] could not attach physics on load', e); }
         });
 
         // Fix: delay applying ammo-shape for entities that use a glTF model and the `grabbable` mixin/class.
