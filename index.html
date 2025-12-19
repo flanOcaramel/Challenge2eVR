@@ -1,163 +1,1046 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-    <title>Challenge2e VR Carousel</title>
-    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-</head>
-<body>
-    <a-scene>
-        <a-camera position="0 1.6 0">
-            <a-cursor raycaster="objects: .clickable"></a-cursor>
-        </a-camera>
+    <head>
+        <meta charset="UTF-8" />
+        <title>Challenge2e VR Carousel</title>
+        <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/super-hands@3.0.0/dist/super-hands.min.js"></script>
+    </head>
+    <body>
+        <a-scene vr-mode-ui="enabled: true">
+            <!-- Lumière générale ambiante -->
+            <a-light type="ambient" color="#404040" intensity="0.6"></a-light>
+            <a-light
+                type="directional"
+                position="2 4 2"
+                color="#FFFFFF"
+                intensity="0.8"
+                target="a-scene"
+            ></a-light>
 
-        <a-entity id="carousel" position="0 1.6 -3" rotation="0 0 0">
-            <!-- Users will be added here dynamically -->
-        </a-entity>
+            <!-- Lumière spot sur le clavier -->
+            <a-light
+                type="spot"
+                position="0 3 3"
+                color="#FFFFFF"
+                intensity="1.5"
+                angle="45"
+                penumbra="0.3"
+                target="#vr-keyboard"
+            ></a-light>
+            <a-light
+                type="point"
+                position="1 2 2.5"
+                color="#FFFFFF"
+                intensity="0.8"
+            ></a-light>
 
-        <a-plane position="0 0 -4" rotation="-90 0 0" width="10" height="10" color="#7BC8A4"></a-plane>
+            <!-- Caméra avec contrôles desktop et VR -->
+            <a-camera
+                position="0 1.6 0"
+                vr-mode-ui="enabled: true"
+                look-controls
+                raycaster="objects: .clickable, .hoverable"
+                cursor
+            ></a-camera>
 
+            <!-- VR controllers with raycasters optimisés pour casque -->
+            <a-entity
+                id="leftHand"
+                hand-controls="hand: left"
+                laser-controls
+                raycaster="objects: .clickable, .hoverable"
+                cursor
+                super-hands="grabStartButtons: trigger; grabEndButtons: trigger"
+                line="color: #00ff00; opacity: 0.8"
+            ></a-entity>
+            <a-entity
+                id="rightHand"
+                hand-controls="hand: right"
+                laser-controls
+                raycaster="objects: .clickable, .hoverable"
+                cursor
+                super-hands="grabStartButtons: trigger; grabEndButtons: trigger"
+                line="color: #00ff00; opacity: 0.8"
+            ></a-entity>
 
-    </a-scene>
+            <!-- Left arrow button -->
+            <a-entity
+                id="left-btn"
+                position="-0.8 1 -2.5"
+                class="hoverable clickable"
+            >
+                <a-box
+                    id="left-btn-box"
+                    width="0.4"
+                    height="0.4"
+                    depth="0.05"
+                    color="#4CAF50"
+                    position="0 0 0.05"
+                    class="hoverable"
+                ></a-box>
+                <a-text
+                    id="left-btn-text"
+                    value="◀"
+                    position="0 0 0.1"
+                    align="center"
+                    scale="2.5 2.5 2.5"
+                    color="#000000"
+                ></a-text>
+            </a-entity>
 
-    <div id="password-overlay" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border: 1px solid black;">
-        <p>Enter password for <span id="user-name"></span>:</p>
-        <input type="password" id="password-input">
-        <button id="submit-btn">Submit</button>
-        <button id="cancel-btn">Cancel</button>
-    </div>
+            <!-- Right arrow button -->
+            <a-entity
+                id="right-btn"
+                position="0.8 1 -2.5"
+                class="hoverable clickable"
+            >
+                <a-box
+                    id="right-btn-box"
+                    width="0.4"
+                    height="0.4"
+                    depth="0.05"
+                    color="#4CAF50"
+                    position="0 0 0.05"
+                    class="hoverable"
+                ></a-box>
+                <a-text
+                    id="right-btn-text"
+                    value="▶"
+                    position="0 0 0.1"
+                    align="center"
+                    scale="2.5 2.5 2.5"
+                    color="#000000"
+                ></a-text>
+            </a-entity>
 
-    <script>
-        let users = [];
-        let selectedUser = null;
+            <!-- Single tile container -->
+            <a-entity id="carousel" position="0 0 -3">
+                <!-- Single tile will be added here -->
+            </a-entity>
 
-        // Fetch users from Challenge2e DB via API
-        fetch('https://selles-francesconi.sio-chopin.fr/Challenge2e/public/api.php')
-            .then(response => response.json())
-            .then(data => {
-                users = data;
-                createCarousel();
-            })
-            .catch(error => {
-                console.error('Error fetching users:', error);
-                // Fallback to mock data
-                users = [
-                    { username: 'Alice', modelAvatar: 'adventurer.glb', nameWorld: 'Plaine', urlWorld: 'vr.html' },
-                    { username: 'Bob', modelAvatar: 'astronaut.glb', nameWorld: 'Mer', urlWorld: 'http://example.com/mer' },
-                    { username: 'Charlie', modelAvatar: 'pug.glb', nameWorld: 'Plaine', urlWorld: 'vr.html' }
-                ];
-                createCarousel();
+            <a-sky color="#4B0082"></a-sky>
+            <a-plane
+                position="0 0 -4"
+                rotation="-90 0 0"
+                width="10"
+                height="10"
+                color="#2C3E50"
+            ></a-plane>
+        </a-scene>
+
+        <div
+            id="password-overlay"
+            style="
+                display: none;
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: white;
+                padding: 20px;
+                border: 1px solid black;
+            "
+        >
+            <p>Enter password for <span id="user-name"></span>:</p>
+            <input type="password" id="password-input" />
+            <button id="submit-btn">Submit</button>
+            <button id="cancel-btn">Cancel</button>
+        </div>
+
+        <!-- Message d'accès VR uniquement -->
+        <div
+            id="desktop-warning"
+            style="
+                display: none;
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: #333;
+                color: white;
+                padding: 30px;
+                border-radius: 10px;
+                text-align: center;
+                z-index: 10000;
+                font-family: Arial, sans-serif;
+            "
+        >
+            <h2>Cette application nécessite un casque VR</h2>
+            <p>
+                Veuillez utiliser un casque de réalité virtuelle pour accéder à
+                cette expérience.
+            </p>
+            <p>
+                Si vous utilisez un casque, assurez-vous que le navigateur
+                supporte WebXR.
+            </p>
+        </div>
+
+        <script>
+            // Retirer la limitation au casque VR - permettre l'accès avec un ordinateur
+            // La scène VR fonctionne en mode desktop avec contrôles souris
+            // if (!navigator.xr) {
+            //     document.getElementById('desktop-warning').style.display = 'block';
+            //     // Cacher la scène VR
+            //     document.addEventListener('DOMContentLoaded', function() {
+            //         if (document.querySelector('a-scene')) {
+            //             document.querySelector('a-scene').style.display = 'none';
+            //         }
+            //     });
+            // }
+
+            let users = [];
+            let selectedUser = null;
+            let currentIndex = 0;
+            let currentPassword = "";
+            let currentMode = "letters"; // 'letters' or 'symbols'
+            let capsLock = false;
+            let isKeyboardVisible = false;
+            let isProcessingAction = false;
+
+            // Layouts du clavier (globaux)
+            const lettersLayout = [
+                // Première rangée (lettres QWERTYUIOP)
+                ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
+                // Deuxième rangée (lettres ASDFGHJKL)
+                ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
+                // Troisième rangée (lettres ZXCVBNM)
+                ["z", "x", "c", "v", "b", "n", "m"],
+            ];
+
+            const symbolsLayout = [
+                // Première rangée de symboles
+                ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+                // Deuxième rangée de symboles
+                ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")"],
+                // Troisième rangée de symboles
+                ["-", "=", "[", "]", "\\", ";", "'", ",", ".", "/"],
+            ];
+
+            // Test direct interaction
+            document.addEventListener("DOMContentLoaded", () => {
+                setTimeout(() => {
+                    const leftHand = document.getElementById("leftHand");
+                    const rightHand = document.getElementById("rightHand");
+
+                    if (leftHand) {
+                        leftHand.addEventListener("triggerdown", () => {
+                            console.log("Left trigger pressed");
+                        });
+                    }
+
+                    if (rightHand) {
+                        rightHand.addEventListener("triggerdown", () => {
+                            console.log("Right trigger pressed");
+                        });
+                    }
+                }, 1000);
             });
 
-        function createCarousel() {
-            const carousel = document.getElementById('carousel');
-            const radius = 3;
-            const angleStep = (2 * Math.PI) / users.length;
+            // Fetch users from Challenge2e DB via API
+            fetch(
+                "https://selles-francesconi.sio-chopin.fr/Challenge2e/public/api.php",
+            )
+                .then((response) => response.json())
+                .then((data) => {
+                    users = data;
+                    createSingleTile();
+                    setupButtons();
+                })
+                .catch((error) => {
+                    console.error("Error fetching users:", error);
+                    // Fallback to mock data
+                    users = [
+                        {
+                            username: "Alice",
+                            modelAvatar: "adventurer.glb",
+                            nameWorld: "Plaine",
+                            urlWorld: "vr.html",
+                        },
+                        {
+                            username: "Bob",
+                            modelAvatar: "astronaut.glb",
+                            nameWorld: "Mer",
+                            urlWorld: "http://example.com/mer",
+                        },
+                        {
+                            username: "Charlie",
+                            modelAvatar: "pug.glb",
+                            nameWorld: "Plaine",
+                            urlWorld: "vr.html",
+                        },
+                    ];
+                    createSingleTile();
+                    setupButtons();
+                });
 
-            users.forEach((user, index) => {
-                const angle = index * angleStep;
-                const x = Math.cos(angle) * radius;
-                const z = Math.sin(angle) * radius;
-
-                const userEntity = document.createElement('a-entity');
-                userEntity.setAttribute('position', `${x} 0 ${z}`);
-                userEntity.setAttribute('look-at', '0 1.6 0');
-
-                // Avatar 3D
-                const avatar = document.createElement('a-gltf-model');
-                avatar.setAttribute('src', `assets/models/${user.modelAvatar}`);
-                avatar.setAttribute('scale', '0.5 0.5 0.5');
-                userEntity.appendChild(avatar);
-
-                // Name text
-                const nameText = document.createElement('a-text');
-                nameText.setAttribute('value', user.username);
-                nameText.setAttribute('position', '0 1 0');
-                nameText.setAttribute('align', 'center');
-                userEntity.appendChild(nameText);
-
-                // Make clickable
-                userEntity.setAttribute('class', 'clickable');
-                userEntity.addEventListener('click', () => selectUser(user));
-
-                carousel.appendChild(userEntity);
-            });
-        }
-
-        function selectUser(user) {
-            selectedUser = user;
-            if (user.nameWorld !== 'Plaine') {
-                window.location.href = user.urlWorld;
-            } else {
-                showPasswordPrompt();
+            function createSingleTile() {
+                console.log("createSingleTile called");
+                const carousel = document.getElementById("carousel");
+                updateTile();
             }
-        }
 
-        function showPasswordPrompt() {
-            document.getElementById('user-name').textContent = selectedUser.username;
-            document.getElementById('password-overlay').style.display = 'block';
-        }
+            function updateTile() {
+                console.log("updateTile called, currentIndex:", currentIndex);
 
-        document.getElementById('submit-btn').addEventListener('click', () => {
-            const password = document.getElementById('password-input').value;
-            fetch('https://selles-francesconi.sio-chopin.fr/Challenge2e/public/login.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: selectedUser.username, password: password })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    window.location.href = 'https://selles-francesconi.sio-chopin.fr/Challenge2eVR/vr.html';
-                } else {
-                    alert('Incorrect password');
+                const carousel = document.getElementById("carousel");
+                console.log("carousel:", carousel);
+
+                // Clear previous
+                while (carousel.firstChild) {
+                    carousel.removeChild(carousel.firstChild);
                 }
-            })
-            .catch(error => {
-                console.error('Login error:', error);
-                alert('Login service unavailable');
-            });
-        });
 
-        document.getElementById('cancel-btn').addEventListener('click', () => {
-            document.getElementById('password-overlay').style.display = 'none';
-            document.getElementById('password-input').value = '';
-        });
+                if (!users || users.length === 0) {
+                    console.log("No users available");
+                    return;
+                }
 
-        // For carousel rotation
-        document.addEventListener('keydown', (e) => {
-            const carousel = document.getElementById('carousel');
-            let rotation = carousel.getAttribute('rotation');
-            if (e.key === 'ArrowLeft') {
-                rotation.y += 10;
-            } else if (e.key === 'ArrowRight') {
-                rotation.y -= 10;
+                const user = users[currentIndex];
+                console.log("Current user:", user);
+
+                const tile = document.createElement("a-entity");
+                tile.setAttribute("position", "0 0 0");
+                tile.setAttribute("class", "hoverable grabbable clickable");
+
+                // Avatar 3D (real model)
+                const avatar = document.createElement("a-gltf-model");
+                avatar.setAttribute("src", `assets/models/${user.modelAvatar}`);
+                avatar.setAttribute("position", "0 0 0");
+                let scale = "0.8 0.8 0.8"; // Reduced size
+                if (user.modelAvatar.includes("pug")) {
+                    scale = "0.5 0.5 0.5"; // Smaller for dog
+                }
+                avatar.setAttribute("scale", scale);
+                tile.appendChild(avatar);
+
+                // Plus de spot sur l'avatar (remplacé par lumière générale)
+
+                // Name text (adjusted for smaller avatar)
+                const nameText = document.createElement("a-text");
+                nameText.setAttribute("value", user.username);
+                nameText.setAttribute("position", "0 1.5 0.1");
+                nameText.setAttribute("align", "center");
+                nameText.setAttribute("scale", "0.5 0.5 0.5");
+                nameText.setAttribute("color", "#ffffff");
+                tile.appendChild(nameText);
+
+                // Select button in front at lower height
+                const selectBtn = document.createElement("a-entity");
+                selectBtn.setAttribute("id", `select-btn-${currentIndex}`);
+                selectBtn.setAttribute("position", "0 0.2 0.8");
+                selectBtn.setAttribute("class", "hoverable clickable");
+                selectBtn.setAttribute("fuse-timeout", "2000");
+
+                const selectBox = document.createElement("a-box");
+                selectBox.setAttribute("class", "select-box");
+                selectBox.setAttribute("width", "0.8");
+                selectBox.setAttribute("height", "0.25");
+                selectBox.setAttribute("depth", "0.05");
+                selectBox.setAttribute("color", "#2196F3");
+                selectBox.setAttribute("position", "0 0 0.05");
+                selectBtn.appendChild(selectBox);
+
+                const selectText = document.createElement("a-text");
+                selectText.setAttribute("value", "Sélectionner");
+                selectText.setAttribute("position", "0 0 0.1");
+                selectText.setAttribute("align", "center");
+                selectText.setAttribute("scale", "0.4 0.4 0.4");
+                selectText.setAttribute("color", "#ffffff");
+                selectBtn.appendChild(selectText);
+
+                selectBtn.addEventListener("click", () => {
+                    console.log("Select button clicked in VR");
+                    selectUser(user);
+                });
+                selectBtn.addEventListener("fuse", () => {
+                    console.log("Select button fuse triggered in VR");
+                    selectUser(user);
+                });
+                // Support VR controller trigger via mousedown (raycaster simulation)
+                selectBtn.addEventListener("mousedown", () => {
+                    if (isProcessingAction) return;
+                    isProcessingAction = true;
+                    console.log("Select button mousedown in VR");
+                    selectUser(user);
+                    setTimeout(() => {
+                        isProcessingAction = false;
+                    }, 100);
+                });
+                selectBtn.addEventListener("mouseenter", function () {
+                    const box = this.querySelector(".select-box");
+                    if (box) box.setAttribute("color", "#42A5F5");
+                });
+                selectBtn.addEventListener("mouseleave", function () {
+                    const box = this.querySelector(".select-box");
+                    if (box) box.setAttribute("color", "#2196F3");
+                });
+
+                // Test de survol
+                selectBtn.addEventListener("mouseenter", () => {
+                    console.log("Mouse entered select button");
+                });
+                tile.appendChild(selectBtn);
+
+                carousel.appendChild(tile);
+                console.log("Tile added to carousel");
             }
-            carousel.setAttribute('rotation', rotation);
-        });
 
-        // Mouse drag to rotate carousel
-        let isDragging = false;
-        let previousMouseX = 0;
-
-        document.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            previousMouseX = e.clientX;
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (isDragging) {
-                const deltaX = e.clientX - previousMouseX;
-                const carousel = document.getElementById('carousel');
-                let rotation = carousel.getAttribute('rotation');
-                rotation.y += deltaX * 0.5; // Sensitivity
-                carousel.setAttribute('rotation', rotation);
-                previousMouseX = e.clientX;
+            function nextTile() {
+                console.log("nextTile called");
+                currentIndex = (currentIndex + 1) % users.length;
+                updateTile();
             }
-        });
 
-        document.addEventListener('mouseup', () => {
-            isDragging = false;
-        });
-    </script>
-</body>
+            function prevTile() {
+                console.log("prevTile called");
+                currentIndex = (currentIndex - 1 + users.length) % users.length;
+                updateTile();
+            }
+
+            function setupButtons() {
+                console.log("setupButtons called");
+                // VR controller events uniquement
+                document
+                    .getElementById("left-btn")
+                    .addEventListener("mousedown", prevTile);
+                document
+                    .getElementById("right-btn")
+                    .addEventListener("mousedown", nextTile);
+
+                // Add hover effects
+                setupHoverEffects();
+            }
+
+            function setupHoverEffects() {
+                // Left button hover
+                const leftBtnBox = document.getElementById("left-btn-box");
+                const leftBtnText = document.getElementById("left-btn-text");
+                leftBtnBox.addEventListener("mouseenter", function () {
+                    this.setAttribute("color", "#66BB6A");
+                    leftBtnText.setAttribute("color", "#000000");
+                });
+                leftBtnBox.addEventListener("mouseleave", function () {
+                    this.setAttribute("color", "#4CAF50");
+                    leftBtnText.setAttribute("color", "#000000");
+                });
+
+                // Right button hover
+                const rightBtnBox = document.getElementById("right-btn-box");
+                const rightBtnText = document.getElementById("right-btn-text");
+                rightBtnBox.addEventListener("mouseenter", function () {
+                    this.setAttribute("color", "#66BB6A");
+                    rightBtnText.setAttribute("color", "#000000");
+                });
+                rightBtnBox.addEventListener("mouseleave", function () {
+                    this.setAttribute("color", "#4CAF50");
+                    rightBtnText.setAttribute("color", "#000000");
+                });
+            }
+
+            function selectUser(user) {
+                if (isProcessingAction) return;
+                isProcessingAction = true;
+
+                console.log("selectUser called with:", user);
+                console.log("idWorld:", user.idWorld);
+                selectedUser = user;
+                if (user.idWorld === 1) {
+                    console.log("Showing VR keyboard for world ID 1");
+                    showVRKeyboard();
+                } else {
+                    console.log("Redirecting to:", user.urlWorld);
+                    window.location.href = user.urlWorld;
+                }
+
+                setTimeout(() => {
+                    isProcessingAction = false;
+                }, 100);
+            }
+
+            function showVRKeyboard() {
+                console.log("showVRKeyboard called");
+
+                // Prevent multiple calls
+                if (isKeyboardVisible) {
+                    console.log("Keyboard already visible, ignoring call");
+                    return;
+                }
+
+                // Check if keyboard already exists
+                if (document.getElementById("vr-keyboard")) {
+                    console.log("Keyboard already exists, removing it first");
+                    removeVRKeyboard();
+                }
+
+                // Créer le clavier VR à droite du point d'apparition de l'utilisateur
+                const keyboard = document.createElement("a-entity");
+                keyboard.setAttribute("id", "vr-keyboard");
+                // Positionner légèrement à droite (x positif) et aligné verticalement sur 1.6m
+                const keyboardX = 0.8;
+                keyboard.setAttribute("position", `${keyboardX} 1.6 -3`);
+                keyboard.setAttribute("rotation", "0 180 0");
+
+                // Plus de panneau de fond (retiré pour meilleure visibilité)
+
+                // Plus d'ancienne zone de texte (remplacée par l'affichage au-dessus du clavier)
+
+                currentPassword = "";
+                currentMode = "letters"; // 'letters' or 'symbols'
+                capsLock = false;
+
+                // Ajouter le nom d'utilisateur au-dessus du clavier
+                const userLabel = document.createElement("a-text");
+                userLabel.setAttribute("id", "vr-user-label");
+                userLabel.setAttribute(
+                    "value",
+                    `Utilisateur: ${selectedUser.username}`,
+                );
+                userLabel.setAttribute("position", "0 1.2 0.06");
+                userLabel.setAttribute("align", "center");
+                userLabel.setAttribute("scale", "0.25 0.25 0.25");
+                userLabel.setAttribute("color", "#FFFFFF");
+                keyboard.appendChild(userLabel);
+
+                // Ajouter l'affichage du mot de passe avec étoiles
+                const passwordLabel = document.createElement("a-text");
+                passwordLabel.setAttribute("id", "vr-password-label");
+                passwordLabel.setAttribute("value", "Mot de passe: ");
+                passwordLabel.setAttribute("position", "0 0.9 0.06");
+                passwordLabel.setAttribute("align", "center");
+                passwordLabel.setAttribute("scale", "0.25 0.25 0.25");
+                passwordLabel.setAttribute("color", "#FFFFFF");
+                keyboard.appendChild(passwordLabel);
+
+                // Ajouter le clavier à la scène d'abord
+                console.log("Adding keyboard to scene");
+                document.querySelector("a-scene").appendChild(keyboard);
+
+                // Créer les touches principales après que le clavier soit dans la scène
+                setTimeout(() => {
+                    console.log("About to call createMainKeys");
+                    createMainKeys();
+                    console.log("createMainKeys called");
+
+                    // Ajouter les autres boutons du clavier
+                    console.log("About to call createOtherKeyboardElements");
+                    createOtherKeyboardElements();
+                    console.log("createOtherKeyboardElements called");
+
+                    isKeyboardVisible = true;
+                }, 100);
+            }
+
+            // Fonction pour créer les touches principales (déplacée hors de showVRKeyboard)
+            function createMainKeys() {
+                console.log("createMainKeys function called");
+                const keyboard = document.getElementById("vr-keyboard");
+                if (!keyboard) {
+                    console.log("Keyboard element not found");
+                    return;
+                }
+
+                const layout =
+                    currentMode === "letters" ? lettersLayout : symbolsLayout;
+
+                layout.forEach((row, rowIndex) => {
+                    row.forEach((key, keyIndex) => {
+                        const keyButton = document.createElement("a-entity");
+
+                        // Positionnement selon la rangée
+                        let xPos, yPos;
+                        if (rowIndex === 0) {
+                            // Première rangée
+                            xPos = -1.8 + keyIndex * 0.35;
+                            yPos = 0.6;
+                        } else if (rowIndex === 1) {
+                            // Deuxième rangée
+                            xPos = -1.4 + keyIndex * 0.35;
+                            yPos = 0.3;
+                        } else if (rowIndex === 2) {
+                            // Troisième rangée
+                            xPos = -0.9 + keyIndex * 0.35;
+                            yPos = 0;
+                        }
+
+                        keyButton.setAttribute(
+                            "position",
+                            `${xPos} ${yPos} 0.06`,
+                        );
+                        keyButton.setAttribute(
+                            "class",
+                            "hoverable clickable main-key",
+                        );
+
+                        const keyBox = document.createElement("a-box");
+                        keyBox.setAttribute("width", "0.3");
+                        keyBox.setAttribute("height", "0.2");
+                        keyBox.setAttribute("depth", "0.02");
+                        keyBox.setAttribute("color", "#555555");
+                        keyBox.setAttribute("position", "0 0 0.01");
+                        keyButton.appendChild(keyBox);
+
+                        const keyText = document.createElement("a-text");
+                        let displayKey = key;
+                        if (currentMode === "letters" && capsLock) {
+                            displayKey = key.toUpperCase();
+                        }
+                        keyText.setAttribute("value", displayKey);
+                        keyText.setAttribute("position", "0 0 0.02");
+                        keyText.setAttribute("align", "center");
+                        keyText.setAttribute("scale", "0.15 0.15 0.15");
+                        keyText.setAttribute("color", "#FFFFFF");
+                        keyButton.appendChild(keyText);
+
+                        keyButton.addEventListener("mousedown", () => {
+                            if (isProcessingAction) return;
+                            isProcessingAction = true;
+
+                            let charToAdd = key;
+                            if (currentMode === "letters") {
+                                charToAdd = capsLock ? key.toUpperCase() : key;
+                            }
+                            currentPassword += charToAdd;
+                            updatePasswordDisplay(currentPassword);
+
+                            setTimeout(() => {
+                                isProcessingAction = false;
+                            }, 50);
+                        });
+                        keyButton.addEventListener("mouseenter", function () {
+                            const box = this.querySelector("a-box");
+                            if (box) box.setAttribute("color", "#777777");
+                        });
+                        keyButton.addEventListener("mouseleave", function () {
+                            const box = this.querySelector("a-box");
+                            if (box) box.setAttribute("color", "#555555");
+                        });
+
+                        keyboard.appendChild(keyButton);
+                    });
+                });
+                console.log("All main keys created");
+            }
+
+            // Fonction pour créer les autres éléments du clavier
+            function createOtherKeyboardElements() {
+                console.log("Creating other keyboard elements");
+                const keyboard = document.getElementById("vr-keyboard");
+                if (!keyboard) return;
+
+                // Pavé numérique à droite
+                const numpadLayout = [
+                    ["7", "8", "9"],
+                    ["4", "5", "6"],
+                    ["1", "2", "3"],
+                    ["0", ".", "00"],
+                ];
+
+                numpadLayout.forEach((row, rowIndex) => {
+                    row.forEach((key, keyIndex) => {
+                        const keyButton = document.createElement("a-entity");
+                        const xPos = 2.2 + keyIndex * 0.35;
+                        const yPos = 0.3 - rowIndex * 0.3;
+
+                        keyButton.setAttribute(
+                            "position",
+                            `${xPos} ${yPos} 0.06`,
+                        );
+                        keyButton.setAttribute("class", "hoverable clickable");
+
+                        const keyBox = document.createElement("a-box");
+                        keyBox.setAttribute("width", "0.3");
+                        keyBox.setAttribute("height", "0.2");
+                        keyBox.setAttribute("depth", "0.02");
+                        keyBox.setAttribute("color", "#444466");
+                        keyBox.setAttribute("position", "0 0 0.01");
+                        keyButton.appendChild(keyBox);
+
+                        const keyText = document.createElement("a-text");
+                        keyText.setAttribute("value", key);
+                        keyText.setAttribute("position", "0 0 0.02");
+                        keyText.setAttribute("align", "center");
+                        keyText.setAttribute("scale", "0.15 0.15 0.15");
+                        keyText.setAttribute("color", "#FFFFFF");
+                        keyButton.appendChild(keyText);
+
+                        keyButton.addEventListener("mousedown", () => {
+                            if (isProcessingAction) return;
+                            isProcessingAction = true;
+
+                            currentPassword += key;
+                            updatePasswordDisplay(currentPassword);
+
+                            setTimeout(() => {
+                                isProcessingAction = false;
+                            }, 50);
+                        });
+                        keyButton.addEventListener("mouseenter", function () {
+                            const box = this.querySelector("a-box");
+                            if (box) box.setAttribute("color", "#666688");
+                        });
+                        keyButton.addEventListener("mouseleave", function () {
+                            const box = this.querySelector("a-box");
+                            if (box) box.setAttribute("color", "#444466");
+                        });
+
+                        keyboard.appendChild(keyButton);
+                    });
+                });
+
+                // Bouton Maj (majuscules)
+                const shiftKey = document.createElement("a-entity");
+                shiftKey.setAttribute("position", "0.4 -0.9 0.06");
+                shiftKey.setAttribute("class", "hoverable clickable");
+
+                const shiftBox = document.createElement("a-box");
+                shiftBox.setAttribute("width", "0.8");
+                shiftBox.setAttribute("height", "0.2");
+                shiftBox.setAttribute("depth", "0.02");
+                shiftBox.setAttribute(
+                    "color",
+                    capsLock ? "#4CAF50" : "#666666",
+                );
+                shiftBox.setAttribute("position", "0 0 0.01");
+                shiftKey.appendChild(shiftBox);
+
+                const shiftText = document.createElement("a-text");
+                shiftText.setAttribute("value", "MAJ");
+                shiftText.setAttribute("position", "0 0 0.02");
+                shiftText.setAttribute("align", "center");
+                shiftText.setAttribute("scale", "0.12 0.12 0.12");
+                shiftText.setAttribute("color", "#FFFFFF");
+                shiftKey.appendChild(shiftText);
+
+                shiftKey.addEventListener("mousedown", () => {
+                    if (isProcessingAction) return;
+                    isProcessingAction = true;
+
+                    capsLock = !capsLock;
+                    shiftBox.setAttribute(
+                        "color",
+                        capsLock ? "#4CAF50" : "#666666",
+                    );
+                    // Recréer les touches pour mettre à jour l'affichage
+                    const keysToRemove = keyboard.querySelectorAll(".main-key");
+                    keysToRemove.forEach((key) => key.remove());
+                    createMainKeys();
+
+                    setTimeout(() => {
+                        isProcessingAction = false;
+                    }, 100);
+                });
+                shiftKey.addEventListener("mouseenter", function () {
+                    const box = this.querySelector("a-box");
+                    if (box)
+                        box.setAttribute(
+                            "color",
+                            capsLock ? "#66BB6A" : "#888888",
+                        );
+                });
+                shiftKey.addEventListener("mouseleave", function () {
+                    const box = this.querySelector("a-box");
+                    if (box)
+                        box.setAttribute(
+                            "color",
+                            capsLock ? "#4CAF50" : "#666666",
+                        );
+                });
+
+                keyboard.appendChild(shiftKey);
+
+                // Bouton de changement de mode (juste au-dessus de Maj)
+                const modeKey = document.createElement("a-entity");
+                modeKey.setAttribute("position", "0.4 -0.6 0.06");
+                modeKey.setAttribute("class", "hoverable clickable");
+
+                const modeBox = document.createElement("a-box");
+                modeBox.setAttribute("width", "0.8");
+                modeBox.setAttribute("height", "0.2");
+                modeBox.setAttribute("depth", "0.02");
+                modeBox.setAttribute("color", "#4A90E2");
+                modeBox.setAttribute("position", "0 0 0.01");
+                modeKey.appendChild(modeBox);
+
+                const modeText = document.createElement("a-text");
+                modeText.setAttribute(
+                    "value",
+                    currentMode === "letters" ? "123" : "ABC",
+                );
+                modeText.setAttribute("position", "0 0 0.02");
+                modeText.setAttribute("align", "center");
+                modeText.setAttribute("scale", "0.12 0.12 0.12");
+                modeText.setAttribute("color", "#FFFFFF");
+                modeKey.appendChild(modeText);
+
+                modeKey.addEventListener("mousedown", () => {
+                    if (isProcessingAction) return;
+                    isProcessingAction = true;
+
+                    currentMode =
+                        currentMode === "letters" ? "symbols" : "letters";
+                    modeText.setAttribute(
+                        "value",
+                        currentMode === "letters" ? "123" : "ABC",
+                    );
+                    // Recréer les touches principales
+                    const keysToRemove = keyboard.querySelectorAll(".main-key");
+                    keysToRemove.forEach((key) => key.remove());
+                    createMainKeys();
+
+                    setTimeout(() => {
+                        isProcessingAction = false;
+                    }, 100);
+                });
+                modeKey.addEventListener("mouseenter", function () {
+                    const box = this.querySelector("a-box");
+                    if (box) box.setAttribute("color", "#6BA0F2");
+                });
+                modeKey.addEventListener("mouseleave", function () {
+                    const box = this.querySelector("a-box");
+                    if (box) box.setAttribute("color", "#4A90E2");
+                });
+
+                keyboard.appendChild(modeKey);
+
+                // Touche Espace (grande touche en bas)
+                const spaceKey = document.createElement("a-entity");
+                spaceKey.setAttribute("position", "-1.3 -0.9 0.06");
+                spaceKey.setAttribute("class", "hoverable clickable");
+
+                const spaceBox = document.createElement("a-box");
+                spaceBox.setAttribute("width", "2");
+                spaceBox.setAttribute("height", "0.2");
+                spaceBox.setAttribute("depth", "0.02");
+                spaceBox.setAttribute("color", "#666666");
+                spaceBox.setAttribute("position", "0 0 0.01");
+                spaceKey.appendChild(spaceBox);
+
+                const spaceText = document.createElement("a-text");
+                spaceText.setAttribute("value", "ESPACE");
+                spaceText.setAttribute("position", "0 0 0.02");
+                spaceText.setAttribute("align", "center");
+                spaceText.setAttribute("scale", "0.12 0.12 0.12");
+                spaceText.setAttribute("color", "#FFFFFF");
+                spaceKey.appendChild(spaceText);
+
+                spaceKey.addEventListener("mousedown", () => {
+                    if (isProcessingAction) return;
+                    isProcessingAction = true;
+
+                    currentPassword += " ";
+                    updatePasswordDisplay(currentPassword);
+
+                    setTimeout(() => {
+                        isProcessingAction = false;
+                    }, 50);
+                });
+                spaceKey.addEventListener("mouseenter", function () {
+                    const box = this.querySelector("a-box");
+                    if (box) box.setAttribute("color", "#888888");
+                });
+                spaceKey.addEventListener("mouseleave", function () {
+                    const box = this.querySelector("a-box");
+                    if (box) box.setAttribute("color", "#666666");
+                });
+
+                keyboard.appendChild(spaceKey);
+
+                // Bouton effacer
+                const clearBtn = document.createElement("a-entity");
+                clearBtn.setAttribute("position", "-1.5 -1.3 0.08");
+                clearBtn.setAttribute("class", "hoverable clickable");
+
+                const clearBox = document.createElement("a-box");
+                clearBox.setAttribute("width", "0.8");
+                clearBox.setAttribute("height", "0.2");
+                clearBox.setAttribute("depth", "0.02");
+                clearBox.setAttribute("color", "#FF4444");
+                clearBox.setAttribute("position", "0 0 0.01");
+                clearBtn.appendChild(clearBox);
+
+                const clearText = document.createElement("a-text");
+                clearText.setAttribute("value", "EFF");
+                clearText.setAttribute("position", "0 0 0.02");
+                clearText.setAttribute("align", "center");
+                clearText.setAttribute("scale", "0.12 0.12 0.12");
+                clearText.setAttribute("color", "#FFFFFF");
+                clearBtn.appendChild(clearText);
+
+                clearBtn.addEventListener("mousedown", () => {
+                    if (isProcessingAction) return;
+                    isProcessingAction = true;
+
+                    currentPassword = "";
+                    updatePasswordDisplay(currentPassword);
+
+                    setTimeout(() => {
+                        isProcessingAction = false;
+                    }, 50);
+                });
+                clearBtn.addEventListener("mouseenter", function () {
+                    const box = this.querySelector("a-box");
+                    if (box) box.setAttribute("color", "#FF6666");
+                });
+                clearBtn.addEventListener("mouseleave", function () {
+                    const box = this.querySelector("a-box");
+                    if (box) box.setAttribute("color", "#FF4444");
+                });
+
+                keyboard.appendChild(clearBtn);
+
+                // Bouton entrer
+                const enterBtn = document.createElement("a-entity");
+                enterBtn.setAttribute("position", "1.5 -1.3 0.08");
+                enterBtn.setAttribute("class", "hoverable clickable");
+
+                const enterBox = document.createElement("a-box");
+                enterBox.setAttribute("width", "0.8");
+                enterBox.setAttribute("height", "0.2");
+                enterBox.setAttribute("depth", "0.02");
+                enterBox.setAttribute("color", "#4444FF");
+                enterBox.setAttribute("position", "0 0 0.01");
+                enterBtn.appendChild(enterBox);
+
+                const enterText = document.createElement("a-text");
+                enterText.setAttribute("value", "OK");
+                enterText.setAttribute("position", "0 0 0.02");
+                enterText.setAttribute("align", "center");
+                enterText.setAttribute("scale", "0.12 0.12 0.12");
+                enterText.setAttribute("color", "#FFFFFF");
+                enterBtn.appendChild(enterText);
+
+                enterBtn.addEventListener("mousedown", () => {
+                    if (isProcessingAction) return;
+                    isProcessingAction = true;
+
+                    submitVRPassword(currentPassword);
+
+                    setTimeout(() => {
+                        isProcessingAction = false;
+                    }, 100);
+                });
+                enterBtn.addEventListener("mouseenter", function () {
+                    const box = this.querySelector("a-box");
+                    if (box) box.setAttribute("color", "#6666FF");
+                });
+                enterBtn.addEventListener("mouseleave", function () {
+                    const box = this.querySelector("a-box");
+                    if (box) box.setAttribute("color", "#4444FF");
+                });
+
+                keyboard.appendChild(enterBtn);
+
+                console.log("All keyboard elements created");
+            }
+
+            function updatePasswordDisplay(password) {
+                // Mettre à jour l'affichage du mot de passe au-dessus du clavier
+                const passwordLabel =
+                    document.getElementById("vr-password-label");
+                if (passwordLabel) {
+                    passwordLabel.setAttribute(
+                        "value",
+                        `Mot de passe: ${password.replace(/./g, "*")}`,
+                    );
+                }
+            }
+
+            function submitVRPassword(password) {
+                console.log("Submitting password:", password);
+                fetch(
+                    "https://selles-francesconi.sio-chopin.fr/Challenge2e/public/login.php",
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            username: selectedUser.username,
+                            password: password,
+                        }),
+                    },
+                )
+                    .then((response) => response.json())
+                    .then((data) => {
+                        if (data.success) {
+                            removeVRKeyboard();
+                            window.location.href =
+                                "https://selles-francesconi.sio-chopin.fr/Challenge2eVR/vr.html";
+                        } else {
+                            showErrorVR("Mot de passe incorrect");
+                        }
+                    })
+                    .catch((error) => {
+                        console.error("Login error:", error);
+                        showErrorVR("Service indisponible");
+                    });
+            }
+
+            function showErrorVR(message) {
+                const keyboard = document.getElementById("vr-keyboard");
+                if (keyboard) {
+                    const errorText = document.createElement("a-text");
+                    errorText.setAttribute("value", message);
+                    errorText.setAttribute("position", "0 -0.3 0.06");
+                    errorText.setAttribute("align", "center");
+                    errorText.setAttribute("scale", "0.2 0.2 0.2");
+                    errorText.setAttribute("color", "#FF0000");
+                    errorText.setAttribute("id", "vr-error");
+                    keyboard.appendChild(errorText);
+
+                    setTimeout(() => {
+                        const error = document.getElementById("vr-error");
+                        if (error) error.remove();
+                    }, 3000);
+                }
+            }
+
+            function removeVRKeyboard() {
+                const keyboard = document.getElementById("vr-keyboard");
+                if (keyboard) {
+                    keyboard.remove();
+                    isKeyboardVisible = false;
+                }
+            }
+
+            document
+                .getElementById("submit-btn")
+                .addEventListener("click", () => {
+                    const password =
+                        document.getElementById("password-input").value;
+                    fetch(
+                        "https://selles-francesconi.sio-chopin.fr/Challenge2e/public/login.php",
+                        {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                username: selectedUser.username,
+                                password: password,
+                            }),
+                        },
+                    )
+                        .then((response) => response.json())
+                        .then((data) => {
+                            if (data.success) {
+                                window.location.href =
+                                    "https://selles-francesconi.sio-chopin.fr/Challenge2eVR/vr.html";
+                            } else {
+                                alert("Incorrect password");
+                            }
+                        })
+                        .catch((error) => {
+                            console.error("Login error:", error);
+                            alert("Login service unavailable");
+                        });
+                });
+
+            document
+                .getElementById("cancel-btn")
+                .addEventListener("click", () => {
+                    document.getElementById("password-overlay").style.display =
+                        "none";
+                    document.getElementById("password-input").value = "";
+                });
+        </script>
+    </body>
 </html>
