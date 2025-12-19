@@ -259,14 +259,18 @@
             )
                 .then((response) => response.json())
                 .then((data) => {
-                    users = data;
+                    users = sanitizeUsers(data);
+                    if (!users.length) {
+                        console.warn("No non-admin users available from API");
+                        return;
+                    }
                     createSingleTile();
                     setupButtons();
                 })
                 .catch((error) => {
                     console.error("Error fetching users:", error);
-                    // Fallback to mock data
-                    users = [
+                    // Fallback to mock data (also sanitized)
+                    const fallbackUsers = sanitizeUsers([
                         {
                             username: "Alice",
                             modelAvatar: "adventurer.glb",
@@ -285,10 +289,34 @@
                             nameWorld: "Plaine",
                             urlWorld: "vr.html",
                         },
-                    ];
+                    ]);
+                    if (!fallbackUsers.length) {
+                        console.error("Fallback data does not contain non-admin users");
+                        return;
+                    }
+                    users = fallbackUsers;
                     createSingleTile();
                     setupButtons();
                 });
+
+            function sanitizeUsers(userList = []) {
+                return userList.filter((user) => {
+                    const username = (user.username || "").toLowerCase();
+                    return username !== "admin" && username !== "administrator";
+                });
+            }
+
+            const keyInteractionEvents = ["mousedown", "click", "touchstart"];
+
+            function registerKeyInteraction(element, handler) {
+                if (!element || typeof handler !== "function") return;
+                keyInteractionEvents.forEach((evt) => {
+                    element.addEventListener(evt, (e) => {
+                        if (evt === "touchstart") e.preventDefault();
+                        handler(e);
+                    });
+                });
+            }
 
             function createSingleTile() {
                 console.log("createSingleTile called");
@@ -566,7 +594,7 @@
                         text.setAttribute("color", "#FFFFFF");
                         keyEnt.appendChild(text);
 
-                        keyEnt.addEventListener("mousedown", () => {
+                        registerKeyInteraction(keyEnt, () => {
                             if (isProcessingAction) return;
                             isProcessingAction = true;
                             const ch = currentMode === "letters" ? (capsLock ? key.toUpperCase() : key) : key;
@@ -629,7 +657,7 @@
                         keyText.setAttribute("color", "#FFFFFF");
                         keyButton.appendChild(keyText);
 
-                        keyButton.addEventListener("mousedown", () => {
+                        registerKeyInteraction(keyButton, () => {
                             if (isProcessingAction) return;
                             isProcessingAction = true;
 
@@ -680,7 +708,7 @@
                 shiftText.setAttribute("color", "#FFFFFF");
                 shiftKey.appendChild(shiftText);
 
-                shiftKey.addEventListener("mousedown", () => {
+                registerKeyInteraction(shiftKey, () => {
                     if (isProcessingAction) return;
                     isProcessingAction = true;
 
@@ -744,7 +772,7 @@
                 modeText.setAttribute("color", "#FFFFFF");
                 modeKey.appendChild(modeText);
 
-                modeKey.addEventListener("mousedown", () => {
+                registerKeyInteraction(modeKey, () => {
                     if (isProcessingAction) return;
                     isProcessingAction = true;
 
@@ -798,7 +826,7 @@
                 spaceText.setAttribute("color", "#FFFFFF");
                 spaceKey.appendChild(spaceText);
 
-                spaceKey.addEventListener("mousedown", () => {
+                registerKeyInteraction(spaceKey, () => {
                     if (isProcessingAction) return;
                     isProcessingAction = true;
 
@@ -844,7 +872,7 @@
                 clearText.setAttribute("color", "#FFFFFF");
                 clearBtn.appendChild(clearText);
 
-                clearBtn.addEventListener("mousedown", () => {
+                registerKeyInteraction(clearBtn, () => {
                     if (isProcessingAction) return;
                     isProcessingAction = true;
 
@@ -890,7 +918,7 @@
                 enterText.setAttribute("color", "#FFFFFF");
                 enterBtn.appendChild(enterText);
 
-                enterBtn.addEventListener("mousedown", () => {
+                registerKeyInteraction(enterBtn, () => {
                     if (isProcessingAction) return;
                     isProcessingAction = true;
 
