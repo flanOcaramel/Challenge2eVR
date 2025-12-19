@@ -62,8 +62,8 @@
                     hand-controls="hand: right"
                     laser-controls="hand: right"
                     raycaster="objects: .clickable, .hoverable; far: 25"
-                    cursor="rayOrigin: entity; fuse: false"
-                    super-hands="grabStartButtons: trigger; grabEndButtons: trigger"
+                    cursor="rayOrigin: entity; fuse: false; downEvents: triggerdown; upEvents: triggerup"
+                    super-hands="grabStartButtons: grip; grabEndButtons: grip"
                     line="color: #00ff00; opacity: 0.8"
                 ></a-entity>
             </a-entity>
@@ -579,15 +579,16 @@
 
                         const keyEnt = document.createElement("a-entity");
                         keyEnt.setAttribute("position", `${x} ${y} 0.06`);
-                        keyEnt.setAttribute("class", "hoverable clickable main-key");
+                        // Keep a stable class for removing/rebuilding keys; interaction is on the box mesh
+                        keyEnt.setAttribute("class", "main-key");
 
                         const box = document.createElement("a-box");
+                        box.classList.add("key-box", "hoverable", "clickable");
                         box.setAttribute("width", `${keyW}`);
                         box.setAttribute("height", `${keyH}`);
                         box.setAttribute("depth", "0.02");
                         box.setAttribute("color", "#555555");
                         box.setAttribute("position", "0 0 0.01");
-                        box.classList.add("key-box");
                         keyEnt.appendChild(box);
 
                         const text = document.createElement("a-text");
@@ -599,7 +600,7 @@
                         text.setAttribute("color", "#FFFFFF");
                         keyEnt.appendChild(text);
 
-                        registerKeyInteraction(keyEnt, () => {
+                        registerKeyInteraction(box, () => {
                             if (isProcessingAction) return;
                             isProcessingAction = true;
                             const ch = currentMode === "letters" ? (capsLock ? key.toUpperCase() : key) : key;
@@ -608,8 +609,12 @@
                             setTimeout(() => (isProcessingAction = false), 50);
                         });
 
-                        keyEnt.addEventListener("mouseenter", function () { box.setAttribute("color", "#777777"); });
-                        keyEnt.addEventListener("mouseleave", function () { box.setAttribute("color", "#555555"); });
+                        box.addEventListener("mouseenter", function () {
+                            this.setAttribute("color", "#777777");
+                        });
+                        box.addEventListener("mouseleave", function () {
+                            this.setAttribute("color", "#555555");
+                        });
 
                         keyboard.appendChild(keyEnt);
                     });
@@ -644,9 +649,10 @@
                             "position",
                             `${xPos} ${yPos} 0.06`,
                         );
-                        keyButton.setAttribute("class", "hoverable clickable");
+                        keyButton.setAttribute("class", "");
 
                         const keyBox = document.createElement("a-box");
+                        keyBox.classList.add("hoverable", "clickable");
                         keyBox.setAttribute("width", "0.3");
                         keyBox.setAttribute("height", "0.2");
                         keyBox.setAttribute("depth", "0.02");
@@ -662,7 +668,7 @@
                         keyText.setAttribute("color", "#FFFFFF");
                         keyButton.appendChild(keyText);
 
-                        registerKeyInteraction(keyButton, () => {
+                        registerKeyInteraction(keyBox, () => {
                             if (isProcessingAction) return;
                             isProcessingAction = true;
 
@@ -673,13 +679,11 @@
                                 isProcessingAction = false;
                             }, 50);
                         });
-                        keyButton.addEventListener("mouseenter", function () {
-                            const box = this.querySelector("a-box");
-                            if (box) box.setAttribute("color", "#666688");
+                        keyBox.addEventListener("mouseenter", function () {
+                            this.setAttribute("color", "#666688");
                         });
-                        keyButton.addEventListener("mouseleave", function () {
-                            const box = this.querySelector("a-box");
-                            if (box) box.setAttribute("color", "#444466");
+                        keyBox.addEventListener("mouseleave", function () {
+                            this.setAttribute("color", "#444466");
                         });
 
                         keyboard.appendChild(keyButton);
@@ -692,9 +696,10 @@
                     "position",
                     `0.4 ${keyboardSpacing.shiftY} 0.06`,
                 );
-                shiftKey.setAttribute("class", "hoverable clickable");
+                shiftKey.setAttribute("class", "");
 
                 const shiftBox = document.createElement("a-box");
+                shiftBox.classList.add("hoverable", "clickable");
                 shiftBox.setAttribute("width", "0.8");
                 shiftBox.setAttribute("height", "0.2");
                 shiftBox.setAttribute("depth", "0.02");
@@ -713,7 +718,7 @@
                 shiftText.setAttribute("color", "#FFFFFF");
                 shiftKey.appendChild(shiftText);
 
-                registerKeyInteraction(shiftKey, () => {
+                registerKeyInteraction(shiftBox, () => {
                     if (isProcessingAction) return;
                     isProcessingAction = true;
 
@@ -731,21 +736,17 @@
                         isProcessingAction = false;
                     }, 100);
                 });
-                shiftKey.addEventListener("mouseenter", function () {
-                    const box = this.querySelector("a-box");
-                    if (box)
-                        box.setAttribute(
-                            "color",
-                            capsLock ? "#66BB6A" : "#888888",
-                        );
+                shiftBox.addEventListener("mouseenter", function () {
+                    this.setAttribute(
+                        "color",
+                        capsLock ? "#66BB6A" : "#888888",
+                    );
                 });
-                shiftKey.addEventListener("mouseleave", function () {
-                    const box = this.querySelector("a-box");
-                    if (box)
-                        box.setAttribute(
-                            "color",
-                            capsLock ? "#4CAF50" : "#666666",
-                        );
+                shiftBox.addEventListener("mouseleave", function () {
+                    this.setAttribute(
+                        "color",
+                        capsLock ? "#4CAF50" : "#666666",
+                    );
                 });
 
                 keyboard.appendChild(shiftKey);
@@ -756,9 +757,10 @@
                     "position",
                     `0.4 ${keyboardSpacing.modeY} 0.06`,
                 );
-                modeKey.setAttribute("class", "hoverable clickable");
+                modeKey.setAttribute("class", "");
 
                 const modeBox = document.createElement("a-box");
+                modeBox.classList.add("hoverable", "clickable");
                 modeBox.setAttribute("width", "0.8");
                 modeBox.setAttribute("height", "0.2");
                 modeBox.setAttribute("depth", "0.02");
@@ -777,7 +779,7 @@
                 modeText.setAttribute("color", "#FFFFFF");
                 modeKey.appendChild(modeText);
 
-                registerKeyInteraction(modeKey, () => {
+                registerKeyInteraction(modeBox, () => {
                     if (isProcessingAction) return;
                     isProcessingAction = true;
 
@@ -796,13 +798,11 @@
                         isProcessingAction = false;
                     }, 100);
                 });
-                modeKey.addEventListener("mouseenter", function () {
-                    const box = this.querySelector("a-box");
-                    if (box) box.setAttribute("color", "#6BA0F2");
+                modeBox.addEventListener("mouseenter", function () {
+                    this.setAttribute("color", "#6BA0F2");
                 });
-                modeKey.addEventListener("mouseleave", function () {
-                    const box = this.querySelector("a-box");
-                    if (box) box.setAttribute("color", "#4A90E2");
+                modeBox.addEventListener("mouseleave", function () {
+                    this.setAttribute("color", "#4A90E2");
                 });
 
                 keyboard.appendChild(modeKey);
@@ -813,9 +813,10 @@
                     "position",
                     `-1.3 ${keyboardSpacing.spaceY} 0.06`,
                 );
-                spaceKey.setAttribute("class", "hoverable clickable");
+                spaceKey.setAttribute("class", "");
 
                 const spaceBox = document.createElement("a-box");
+                spaceBox.classList.add("hoverable", "clickable");
                 spaceBox.setAttribute("width", "2");
                 spaceBox.setAttribute("height", "0.2");
                 spaceBox.setAttribute("depth", "0.02");
@@ -831,7 +832,7 @@
                 spaceText.setAttribute("color", "#FFFFFF");
                 spaceKey.appendChild(spaceText);
 
-                registerKeyInteraction(spaceKey, () => {
+                registerKeyInteraction(spaceBox, () => {
                     if (isProcessingAction) return;
                     isProcessingAction = true;
 
@@ -842,13 +843,11 @@
                         isProcessingAction = false;
                     }, 50);
                 });
-                spaceKey.addEventListener("mouseenter", function () {
-                    const box = this.querySelector("a-box");
-                    if (box) box.setAttribute("color", "#888888");
+                spaceBox.addEventListener("mouseenter", function () {
+                    this.setAttribute("color", "#888888");
                 });
-                spaceKey.addEventListener("mouseleave", function () {
-                    const box = this.querySelector("a-box");
-                    if (box) box.setAttribute("color", "#666666");
+                spaceBox.addEventListener("mouseleave", function () {
+                    this.setAttribute("color", "#666666");
                 });
 
                 keyboard.appendChild(spaceKey);
@@ -859,9 +858,10 @@
                     "position",
                     `-1.5 ${keyboardSpacing.actionRowY} 0.08`,
                 );
-                clearBtn.setAttribute("class", "hoverable clickable");
+                clearBtn.setAttribute("class", "");
 
                 const clearBox = document.createElement("a-box");
+                clearBox.classList.add("hoverable", "clickable");
                 clearBox.setAttribute("width", "0.8");
                 clearBox.setAttribute("height", "0.2");
                 clearBox.setAttribute("depth", "0.02");
@@ -877,7 +877,7 @@
                 clearText.setAttribute("color", "#FFFFFF");
                 clearBtn.appendChild(clearText);
 
-                registerKeyInteraction(clearBtn, () => {
+                registerKeyInteraction(clearBox, () => {
                     if (isProcessingAction) return;
                     isProcessingAction = true;
 
@@ -888,13 +888,11 @@
                         isProcessingAction = false;
                     }, 50);
                 });
-                clearBtn.addEventListener("mouseenter", function () {
-                    const box = this.querySelector("a-box");
-                    if (box) box.setAttribute("color", "#FF6666");
+                clearBox.addEventListener("mouseenter", function () {
+                    this.setAttribute("color", "#FF6666");
                 });
-                clearBtn.addEventListener("mouseleave", function () {
-                    const box = this.querySelector("a-box");
-                    if (box) box.setAttribute("color", "#FF4444");
+                clearBox.addEventListener("mouseleave", function () {
+                    this.setAttribute("color", "#FF4444");
                 });
 
                 keyboard.appendChild(clearBtn);
@@ -905,9 +903,10 @@
                     "position",
                     `1.5 ${keyboardSpacing.actionRowY} 0.08`,
                 );
-                enterBtn.setAttribute("class", "hoverable clickable");
+                enterBtn.setAttribute("class", "");
 
                 const enterBox = document.createElement("a-box");
+                enterBox.classList.add("hoverable", "clickable");
                 enterBox.setAttribute("width", "0.8");
                 enterBox.setAttribute("height", "0.2");
                 enterBox.setAttribute("depth", "0.02");
@@ -923,7 +922,7 @@
                 enterText.setAttribute("color", "#FFFFFF");
                 enterBtn.appendChild(enterText);
 
-                registerKeyInteraction(enterBtn, () => {
+                registerKeyInteraction(enterBox, () => {
                     if (isProcessingAction) return;
                     isProcessingAction = true;
 
@@ -933,13 +932,11 @@
                         isProcessingAction = false;
                     }, 100);
                 });
-                enterBtn.addEventListener("mouseenter", function () {
-                    const box = this.querySelector("a-box");
-                    if (box) box.setAttribute("color", "#6666FF");
+                enterBox.addEventListener("mouseenter", function () {
+                    this.setAttribute("color", "#6666FF");
                 });
-                enterBtn.addEventListener("mouseleave", function () {
-                    const box = this.querySelector("a-box");
-                    if (box) box.setAttribute("color", "#4444FF");
+                enterBox.addEventListener("mouseleave", function () {
+                    this.setAttribute("color", "#4444FF");
                 });
 
                 keyboard.appendChild(enterBtn);
