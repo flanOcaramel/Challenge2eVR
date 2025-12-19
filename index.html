@@ -37,11 +37,12 @@
 
             <!-- Caméra avec contrôles desktop et VR -->
             <a-camera
-                position="0 1.6 0"
+                id="mainCamera"
+                position="0 1.6 -3"
                 vr-mode-ui="enabled: true"
                 look-controls
-                raycaster="objects: .clickable, .hoverable"
-                cursor
+                raycaster="objects: .clickable, .hoverable; far: 25"
+                cursor="fuse: false"
             ></a-camera>
 
             <!-- VR controllers with raycasters optimisés pour casque -->
@@ -67,7 +68,7 @@
             <!-- Left arrow button -->
             <a-entity
                 id="left-btn"
-                position="-0.8 1 -2.5"
+                position="-0.8 1 -5.5"
                 class="hoverable clickable"
             >
                 <a-box
@@ -92,7 +93,7 @@
             <!-- Right arrow button -->
             <a-entity
                 id="right-btn"
-                position="0.8 1 -2.5"
+                position="0.8 1 -5.5"
                 class="hoverable clickable"
             >
                 <a-box
@@ -115,7 +116,7 @@
             </a-entity>
 
             <!-- Single tile container -->
-            <a-entity id="carousel" position="0 0 -3">
+            <a-entity id="carousel" position="0 0 -6.2">
                 <!-- Single tile will be added here -->
             </a-entity>
 
@@ -198,6 +199,24 @@
             let capsLock = false;
             let isKeyboardVisible = false;
             let isProcessingAction = false;
+            // Position and rotation for the wall-mounted VR keyboard
+            const keyboardTransform = {
+                position: { x: 2.7, y: 1.95, z: -3 },
+                rotation: { x: 0, y: -90, z: 0 },
+            };
+            // Shared spacing values to keep keyboard parts separated
+            const keyboardSpacing = {
+                keyGap: 0.08,
+                rowGap: 0.32,
+                numpadXStart: 2.6,
+                numpadColGap: 0.42,
+                numpadTopY: 0.45,
+                numpadRowGap: 0.34,
+                modeY: -0.75,
+                shiftY: -1.05,
+                spaceY: -1.25,
+                actionRowY: -1.55,
+            };
 
             // Layouts du clavier (globaux)
             const lettersLayout = [
@@ -208,13 +227,9 @@
                 // Troisième rangée (lettres ZXCVBNM)
                 ["z", "x", "c", "v", "b", "n", "m"],
             ];
-
             const symbolsLayout = [
-                // Première rangée de symboles
                 ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
-                // Deuxième rangée de symboles
                 ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")"],
-                // Troisième rangée de symboles
                 ["-", "=", "[", "]", "\\", ";", "'", ",", ".", "/"],
             ];
 
@@ -334,7 +349,10 @@
                 selectBtn.setAttribute("fuse-timeout", "2000");
 
                 const selectBox = document.createElement("a-box");
-                selectBox.setAttribute("class", "select-box");
+                // Make the actual box element detectable by the raycaster
+                // (raycaster matches the intersected mesh element, so it
+                // must have the clickable/hoverable classes).
+                selectBox.setAttribute("class", "select-box hoverable clickable");
                 selectBox.setAttribute("width", "0.8");
                 selectBox.setAttribute("height", "0.25");
                 selectBox.setAttribute("depth", "0.05");
@@ -350,31 +368,30 @@
                 selectText.setAttribute("color", "#ffffff");
                 selectBtn.appendChild(selectText);
 
-                selectBtn.addEventListener("click", () => {
-                    console.log("Select button clicked in VR");
+                // Attach interaction listeners directly on the box element
+                // so the mesh that the raycaster hits handles the events.
+                selectBox.addEventListener("click", () => {
+                    console.log("Select box clicked in VR");
                     selectUser(user);
                 });
-                selectBtn.addEventListener("fuse", () => {
-                    console.log("Select button fuse triggered in VR");
+                selectBox.addEventListener("fuse", () => {
+                    console.log("Select box fuse triggered in VR");
                     selectUser(user);
                 });
-                // Support VR controller trigger via mousedown (raycaster simulation)
-                selectBtn.addEventListener("mousedown", () => {
+                selectBox.addEventListener("mousedown", () => {
                     if (isProcessingAction) return;
                     isProcessingAction = true;
-                    console.log("Select button mousedown in VR");
+                    console.log("Select box mousedown in VR");
                     selectUser(user);
                     setTimeout(() => {
                         isProcessingAction = false;
                     }, 100);
                 });
-                selectBtn.addEventListener("mouseenter", function () {
-                    const box = this.querySelector(".select-box");
-                    if (box) box.setAttribute("color", "#42A5F5");
+                selectBox.addEventListener("mouseenter", function () {
+                    this.setAttribute("color", "#42A5F5");
                 });
-                selectBtn.addEventListener("mouseleave", function () {
-                    const box = this.querySelector(".select-box");
-                    if (box) box.setAttribute("color", "#2196F3");
+                selectBox.addEventListener("mouseleave", function () {
+                    this.setAttribute("color", "#2196F3");
                 });
 
                 // Test de survol
@@ -460,173 +477,116 @@
             }
 
             function showVRKeyboard() {
-                console.log("showVRKeyboard called");
+                console.log("showVRKeyboard called (clean keyboard)");
 
-                // Prevent multiple calls
-                if (isKeyboardVisible) {
-                    console.log("Keyboard already visible, ignoring call");
+                if (isKeyboardVisible) return;
+
+                // Remove any existing keyboard
+                removeVRKeyboard();
+
+                const scene = document.querySelector("a-scene");
+                if (!scene) {
+                    console.warn("Scene not found, cannot show keyboard");
                     return;
                 }
 
-                // Check if keyboard already exists
-                if (document.getElementById("vr-keyboard")) {
-                    console.log("Keyboard already exists, removing it first");
-                    removeVRKeyboard();
-                }
-
-                // Créer le clavier VR à droite du point d'apparition de l'utilisateur
                 const keyboard = document.createElement("a-entity");
                 keyboard.setAttribute("id", "vr-keyboard");
-                // Positionner légèrement à droite (x positif) et aligné verticalement sur 1.6m
-                const keyboardX = 0.8;
-                keyboard.setAttribute("position", `${keyboardX} 1.6 -3`);
-                keyboard.setAttribute("rotation", "0 180 0");
-
-                // Plus de panneau de fond (retiré pour meilleure visibilité)
-
-                // Plus d'ancienne zone de texte (remplacée par l'affichage au-dessus du clavier)
+                keyboard.setAttribute(
+                    "position",
+                    `${keyboardTransform.position.x} ${keyboardTransform.position.y} ${keyboardTransform.position.z}`,
+                );
+                keyboard.setAttribute(
+                    "rotation",
+                    `${keyboardTransform.rotation.x} ${keyboardTransform.rotation.y} ${keyboardTransform.rotation.z}`,
+                );
+                scene.appendChild(keyboard);
 
                 currentPassword = "";
-                currentMode = "letters"; // 'letters' or 'symbols'
+                currentMode = "letters";
                 capsLock = false;
 
-                // Ajouter le nom d'utilisateur au-dessus du clavier
+                // Title and password display
                 const userLabel = document.createElement("a-text");
                 userLabel.setAttribute("id", "vr-user-label");
-                userLabel.setAttribute(
-                    "value",
-                    `Utilisateur: ${selectedUser.username}`,
-                );
-                userLabel.setAttribute("position", "0 1.2 0.06");
+                userLabel.setAttribute("value", `Utilisateur: ${selectedUser.username}`);
+                userLabel.setAttribute("position", "0 0.9 0.06");
                 userLabel.setAttribute("align", "center");
-                userLabel.setAttribute("scale", "0.25 0.25 0.25");
+                userLabel.setAttribute("scale", "0.35 0.35 0.35");
                 userLabel.setAttribute("color", "#FFFFFF");
                 keyboard.appendChild(userLabel);
 
-                // Ajouter l'affichage du mot de passe avec étoiles
                 const passwordLabel = document.createElement("a-text");
                 passwordLabel.setAttribute("id", "vr-password-label");
                 passwordLabel.setAttribute("value", "Mot de passe: ");
-                passwordLabel.setAttribute("position", "0 0.9 0.06");
+                passwordLabel.setAttribute("position", "0 0.65 0.06");
                 passwordLabel.setAttribute("align", "center");
-                passwordLabel.setAttribute("scale", "0.25 0.25 0.25");
+                passwordLabel.setAttribute("scale", "0.32 0.32 0.32");
                 passwordLabel.setAttribute("color", "#FFFFFF");
                 keyboard.appendChild(passwordLabel);
 
-                // Ajouter le clavier à la scène d'abord
-                console.log("Adding keyboard to scene");
-                document.querySelector("a-scene").appendChild(keyboard);
+                // Build keys
+                createMainKeys(keyboard);
+                createOtherKeyboardElements(keyboard);
 
-                // Créer les touches principales après que le clavier soit dans la scène
-                setTimeout(() => {
-                    console.log("About to call createMainKeys");
-                    createMainKeys();
-                    console.log("createMainKeys called");
-
-                    // Ajouter les autres boutons du clavier
-                    console.log("About to call createOtherKeyboardElements");
-                    createOtherKeyboardElements();
-                    console.log("createOtherKeyboardElements called");
-
-                    isKeyboardVisible = true;
-                }, 100);
+                isKeyboardVisible = true;
             }
 
-            // Fonction pour créer les touches principales (déplacée hors de showVRKeyboard)
-            function createMainKeys() {
-                console.log("createMainKeys function called");
-                const keyboard = document.getElementById("vr-keyboard");
-                if (!keyboard) {
-                    console.log("Keyboard element not found");
-                    return;
-                }
+            // Function to create main keys inside the given keyboard container
+            function createMainKeys(keyboard) {
+                const layout = currentMode === "letters" ? lettersLayout : symbolsLayout;
+                const keyW = 0.32;
+                const keyH = 0.22;
+                const gap = keyboardSpacing.keyGap;
+                layout.forEach((row, r) => {
+                    const rowWidth = row.length * (keyW + gap);
+                    row.forEach((key, i) => {
+                        const x = -rowWidth / 2 + i * (keyW + gap) + (keyW + gap) / 2;
+                        const y = 0.25 - r * keyboardSpacing.rowGap;
 
-                const layout =
-                    currentMode === "letters" ? lettersLayout : symbolsLayout;
+                        const keyEnt = document.createElement("a-entity");
+                        keyEnt.setAttribute("position", `${x} ${y} 0.06`);
+                        keyEnt.setAttribute("class", "hoverable clickable main-key");
 
-                layout.forEach((row, rowIndex) => {
-                    row.forEach((key, keyIndex) => {
-                        const keyButton = document.createElement("a-entity");
+                        const box = document.createElement("a-box");
+                        box.setAttribute("width", `${keyW}`);
+                        box.setAttribute("height", `${keyH}`);
+                        box.setAttribute("depth", "0.02");
+                        box.setAttribute("color", "#555555");
+                        box.setAttribute("position", "0 0 0.01");
+                        box.classList.add("key-box");
+                        keyEnt.appendChild(box);
 
-                        // Positionnement selon la rangée
-                        let xPos, yPos;
-                        if (rowIndex === 0) {
-                            // Première rangée
-                            xPos = -1.8 + keyIndex * 0.35;
-                            yPos = 0.6;
-                        } else if (rowIndex === 1) {
-                            // Deuxième rangée
-                            xPos = -1.4 + keyIndex * 0.35;
-                            yPos = 0.3;
-                        } else if (rowIndex === 2) {
-                            // Troisième rangée
-                            xPos = -0.9 + keyIndex * 0.35;
-                            yPos = 0;
-                        }
+                        const text = document.createElement("a-text");
+                        const display = currentMode === "letters" && capsLock ? key.toUpperCase() : key;
+                        text.setAttribute("value", display);
+                        text.setAttribute("align", "center");
+                        text.setAttribute("position", "0 -0.01 0.02");
+                        text.setAttribute("scale", "0.28 0.28 0.28");
+                        text.setAttribute("color", "#FFFFFF");
+                        keyEnt.appendChild(text);
 
-                        keyButton.setAttribute(
-                            "position",
-                            `${xPos} ${yPos} 0.06`,
-                        );
-                        keyButton.setAttribute(
-                            "class",
-                            "hoverable clickable main-key",
-                        );
-
-                        const keyBox = document.createElement("a-box");
-                        keyBox.setAttribute("width", "0.3");
-                        keyBox.setAttribute("height", "0.2");
-                        keyBox.setAttribute("depth", "0.02");
-                        keyBox.setAttribute("color", "#555555");
-                        keyBox.setAttribute("position", "0 0 0.01");
-                        keyButton.appendChild(keyBox);
-
-                        const keyText = document.createElement("a-text");
-                        let displayKey = key;
-                        if (currentMode === "letters" && capsLock) {
-                            displayKey = key.toUpperCase();
-                        }
-                        keyText.setAttribute("value", displayKey);
-                        keyText.setAttribute("position", "0 0 0.02");
-                        keyText.setAttribute("align", "center");
-                        keyText.setAttribute("scale", "0.15 0.15 0.15");
-                        keyText.setAttribute("color", "#FFFFFF");
-                        keyButton.appendChild(keyText);
-
-                        keyButton.addEventListener("mousedown", () => {
+                        keyEnt.addEventListener("mousedown", () => {
                             if (isProcessingAction) return;
                             isProcessingAction = true;
-
-                            let charToAdd = key;
-                            if (currentMode === "letters") {
-                                charToAdd = capsLock ? key.toUpperCase() : key;
-                            }
-                            currentPassword += charToAdd;
+                            const ch = currentMode === "letters" ? (capsLock ? key.toUpperCase() : key) : key;
+                            currentPassword += ch;
                             updatePasswordDisplay(currentPassword);
-
-                            setTimeout(() => {
-                                isProcessingAction = false;
-                            }, 50);
-                        });
-                        keyButton.addEventListener("mouseenter", function () {
-                            const box = this.querySelector("a-box");
-                            if (box) box.setAttribute("color", "#777777");
-                        });
-                        keyButton.addEventListener("mouseleave", function () {
-                            const box = this.querySelector("a-box");
-                            if (box) box.setAttribute("color", "#555555");
+                            setTimeout(() => (isProcessingAction = false), 50);
                         });
 
-                        keyboard.appendChild(keyButton);
+                        keyEnt.addEventListener("mouseenter", function () { box.setAttribute("color", "#777777"); });
+                        keyEnt.addEventListener("mouseleave", function () { box.setAttribute("color", "#555555"); });
+
+                        keyboard.appendChild(keyEnt);
                     });
                 });
-                console.log("All main keys created");
             }
 
             // Fonction pour créer les autres éléments du clavier
-            function createOtherKeyboardElements() {
+            function createOtherKeyboardElements(keyboard) {
                 console.log("Creating other keyboard elements");
-                const keyboard = document.getElementById("vr-keyboard");
+                if (!keyboard) keyboard = document.getElementById("vr-keyboard");
                 if (!keyboard) return;
 
                 // Pavé numérique à droite
@@ -640,8 +600,12 @@
                 numpadLayout.forEach((row, rowIndex) => {
                     row.forEach((key, keyIndex) => {
                         const keyButton = document.createElement("a-entity");
-                        const xPos = 2.2 + keyIndex * 0.35;
-                        const yPos = 0.3 - rowIndex * 0.3;
+                        const xPos =
+                            keyboardSpacing.numpadXStart +
+                            keyIndex * keyboardSpacing.numpadColGap;
+                        const yPos =
+                            keyboardSpacing.numpadTopY -
+                            rowIndex * keyboardSpacing.numpadRowGap;
 
                         keyButton.setAttribute(
                             "position",
@@ -691,7 +655,10 @@
 
                 // Bouton Maj (majuscules)
                 const shiftKey = document.createElement("a-entity");
-                shiftKey.setAttribute("position", "0.4 -0.9 0.06");
+                shiftKey.setAttribute(
+                    "position",
+                    `0.4 ${keyboardSpacing.shiftY} 0.06`,
+                );
                 shiftKey.setAttribute("class", "hoverable clickable");
 
                 const shiftBox = document.createElement("a-box");
@@ -725,7 +692,7 @@
                     // Recréer les touches pour mettre à jour l'affichage
                     const keysToRemove = keyboard.querySelectorAll(".main-key");
                     keysToRemove.forEach((key) => key.remove());
-                    createMainKeys();
+                    createMainKeys(keyboard);
 
                     setTimeout(() => {
                         isProcessingAction = false;
@@ -752,7 +719,10 @@
 
                 // Bouton de changement de mode (juste au-dessus de Maj)
                 const modeKey = document.createElement("a-entity");
-                modeKey.setAttribute("position", "0.4 -0.6 0.06");
+                modeKey.setAttribute(
+                    "position",
+                    `0.4 ${keyboardSpacing.modeY} 0.06`,
+                );
                 modeKey.setAttribute("class", "hoverable clickable");
 
                 const modeBox = document.createElement("a-box");
@@ -787,7 +757,7 @@
                     // Recréer les touches principales
                     const keysToRemove = keyboard.querySelectorAll(".main-key");
                     keysToRemove.forEach((key) => key.remove());
-                    createMainKeys();
+                    createMainKeys(keyboard);
 
                     setTimeout(() => {
                         isProcessingAction = false;
@@ -806,7 +776,10 @@
 
                 // Touche Espace (grande touche en bas)
                 const spaceKey = document.createElement("a-entity");
-                spaceKey.setAttribute("position", "-1.3 -0.9 0.06");
+                spaceKey.setAttribute(
+                    "position",
+                    `-1.3 ${keyboardSpacing.spaceY} 0.06`,
+                );
                 spaceKey.setAttribute("class", "hoverable clickable");
 
                 const spaceBox = document.createElement("a-box");
@@ -849,7 +822,10 @@
 
                 // Bouton effacer
                 const clearBtn = document.createElement("a-entity");
-                clearBtn.setAttribute("position", "-1.5 -1.3 0.08");
+                clearBtn.setAttribute(
+                    "position",
+                    `-1.5 ${keyboardSpacing.actionRowY} 0.08`,
+                );
                 clearBtn.setAttribute("class", "hoverable clickable");
 
                 const clearBox = document.createElement("a-box");
@@ -892,7 +868,10 @@
 
                 // Bouton entrer
                 const enterBtn = document.createElement("a-entity");
-                enterBtn.setAttribute("position", "1.5 -1.3 0.08");
+                enterBtn.setAttribute(
+                    "position",
+                    `1.5 ${keyboardSpacing.actionRowY} 0.08`,
+                );
                 enterBtn.setAttribute("class", "hoverable clickable");
 
                 const enterBox = document.createElement("a-box");
