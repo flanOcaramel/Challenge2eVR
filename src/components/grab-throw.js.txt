@@ -1,0 +1,165 @@
+// Grab & throw component compatible with Ammo (aframe-physics-system).
+// Right controller: trigger down to grab nearest grabbable in front, release to throw.
+// Grabbable items must have class="grabbable" and an ammo-body (ammo-body attr) to benefit from physics.
+
+AFRAME.registerComponent('grab-throw', {
+  schema: {
+    maxDistance: { type: 'number', default: 2.0 },
+    grabClass: { type: 'string', default: 'grabbable' }
+  },
+
+  init: function () {
+    this.grabbed = null;
+    this.grabHadAmmoBody = false;
+    this.grabAmmoBodyAttr = null;
+    this.prevPos = new THREE.Vector3();
+    this.lastTime = null;
+
+    this.onTriggerDown = this.onTriggerDown.bind(this);
+    this.onTriggerUp = this.onTriggerUp.bind(this);
+
+    this.el.addEventListener('triggerdown', this.onTriggerDown);
+    this.el.addEventListener('triggerup', this.onTriggerUp);
+
+    this.el.object3D.getWorldPosition(this.prevPos);
+  },
+
+  onTriggerDown: function () {
+    if (this.grabbed) return;
+
+    const worldPos = new THREE.Vector3();
+    const worldDir = new THREE.Vector3(0, 0, -1);
+    this.el.object3D.getWorldPosition(worldPos);
+    this.el.object3D.getWorldDirection(worldDir);
+
+    const raycaster = new THREE.Raycaster(worldPos, worldDir.normalize(), 0, this.data.maxDistance);
+    const intersects = raycaster.intersectObjects(this.el.sceneEl.object3D.children, true);
+    for (let i = 0; i < intersects.length; i++) {
+      const obj = intersects[i].object;
+      const el = obj.el;
+      if (el && el.classList && el.classList.contains(this.data.grabClass)) {
+        this.grabEntity(el);
+        return;
+      }
+    }
+  },
+
+  grabEntity: function (entity) {
+    if (!entity) return;
+    this.grabbed = entity;
+
+    // store ammo-body attribute if present, then remove it so physics body is not interfering while attached
+    if (entity.getAttribute('ammo-body')) {
+      this.grabHadAmmoBody = true;
+      this.grabAmmoBodyAttr = entity.getAttribute('ammo-body');
+      try { entity.removeAttribute('ammo-body'); } catch (e) { /* ignore */ }
+    } else {
+      this.grabHadAmmoBody = false;
+      this.grabAmmoBodyAttr = null;
+    }
+
+    // Preserve world matrix then attach to controller
+    entity.object3D.updateMatrixWorld();
+    const worldMatrix = entity.object3D.matrixWorld.clone();
+    const controllerInv = new THREE.Matrix4().getInverse(this.el.object3D.matrixWorld);
+    const localMatrix = new THREE.Matrix4().copy(controllerInv).multiply(worldMatrix);
+
+    entity.object3D.matrix.copy(localMatrix);
+    entity.object3D.matrix.decompose(entity.object3D.position, entity.object3D.quaternion, entity.object3D.scale);
+    this.el.object3D.add(entity.object3D);
+
+    // try to disable any existing physics body
+    if (entity.body) {
+      try { entity.body.setActivationState && entity.body.setActivationState(4); } catch (e) {}
+    }
+  },
+
+  onTriggerUp: function () {
+    if (!this.grabbed) return;
+
+    // estimate velocity from controller movement
+    const now = performance.now();
+    const dt = this.lastTime ? (now - this.lastTime) / 1000 : 1 / 60;
+    const currentPos = new THREE.Vector3();
+    this.el.object3D.getWorldPosition(currentPos);
+    const vel = new THREE.Vector3().subVectors(currentPos, this.prevPos).divideScalar(Math.max(dt, 1e-6));
+
+    // detach and preserve world transform
+    this.grabbed.object3D.updateMatrixWorld();
+    const worldMatrix = this.grabbed.object3D.matrixWorld.clone();
+    this.el.sceneEl.object3D.add(this.grabbed.object3D);
+    this.grabbed.object3D.matrix.copy(worldMatrix);
+    this.grabbed.object3D.matrix.decompose(this.grabbed.object3D.position, this.grabbed.object3D.quaternion, this.grabbed.object3D.scale);
+
+    const ent = this.grabbed;
+
+    if (this.grabHadAmmoBody) {
+      // re-add ammo-body attr (using stored string or default)
+      try {
+        if (typeof this.grabAmmoBodyAttr === 'string' && this.grabAmmoBodyAttr.trim().length) {
+          ent.setAttribute('ammo-body', this.grabAmmoBodyAttr);
+        } else {
+          ent.setAttribute('ammo-body', 'type: dynamic; mass: 1');
+        }
+      } catch (e) {}
+
+      // Wait a tick for physics system to create the body, then apply velocity
+      setTimeout(() => {
+        if (ent.body && ent.body.setLinearVelocity) {
+          try {
+            ent.body.setLinearVelocity && ent.body.setLinearVelocity(new Ammo.btVector3(vel.x, vel.y, vel.z));
+            // if there's an API ent.body.velocity, try to set it too (compat)
+            if (ent.body.velocity) {
+              ent.body.velocity.set(vel.x, vel.y, vel.z);
+            }
+          } catch (e) {
+            // fallback: try simple attribute
+            try { ent.setAttribute('velocity', { x: vel.x, y: vel.y, z: vel.z }); } catch (ee) {}
+          }
+        } else if (ent.body && ent.body.velocity) {
+          try { ent.body.velocity.set(vel.x, vel.y, vel.z); } catch (e) {}
+        } else {
+          // no physics body: fallback to simple animation
+          this._animateThrowFallback(ent, vel);
+        }
+      }, 50);
+    } else {
+      // entity had no physics -> animate basic ballistic motion
+      this._animateThrowFallback(ent, vel);
+    }
+
+    // cleanup
+    this.grabbed = null;
+    this.grabHadAmmoBody = false;
+    this.grabAmmoBodyAttr = null;
+  },
+
+  _animateThrowFallback: function (ent, initialVel) {
+    const forward = new THREE.Vector3();
+    this.el.object3D.getWorldDirection(forward);
+    const throwVel = initialVel.length() > 0 ? initialVel : forward.multiplyScalar(3);
+    const initialPos = ent.object3D.position.clone();
+    const startTime = performance.now();
+    const duration = 1.2;
+    const gravity = new THREE.Vector3(0, -9.8, 0);
+    const anim = setInterval(() => {
+      const t = (performance.now() - startTime) / 1000;
+      if (t > duration) { clearInterval(anim); return; }
+      const disp = new THREE.Vector3().copy(throwVel).multiplyScalar(t).addScaledVector(gravity, 0.5 * t * t);
+      ent.object3D.position.copy(initialPos.clone().add(disp));
+    }, 16);
+  },
+
+  tick: function () {
+    const now = performance.now();
+    const currentPos = new THREE.Vector3();
+    this.el.object3D.getWorldPosition(currentPos);
+    this.prevPos.copy(currentPos);
+    this.lastTime = now;
+  },
+
+  remove: function () {
+    this.el.removeEventListener('triggerdown', this.onTriggerDown);
+    this.el.removeEventListener('triggerup', this.onTriggerUp);
+  }
+});
